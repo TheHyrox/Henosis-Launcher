@@ -81,13 +81,17 @@ pub static PRESETS: &[Preset] = &[
         "{settings} -g {rom}", ["fullscreen", "dockedMode", "resolutionScale", "scalingFilter", "advanced"], ""),
     preset!("azahar", "Azahar", ["n3ds"],
         ["azahar", "azahar-qt"], ["org.azahar_emu.Azahar"], ["azahar"],
-        "{settings} {rom}", ["fullscreen", "screenLayout", "resolutionScale", "render3d", "advanced"], ""),
+        "{settings} {rom}",
+        ["fullscreen", "screenLayout", "screenRotation", "swapScreens", "screenGap", "resolutionScale", "graphicsApi", "scalingFilter", "aspectRatio", "vsync", "render3d", "cpuOverclock", "advanced"],
+        "Custom Nexus build with direct CLI flags for layout, rotation, screen swap, resolution scale, 3D mode, and pre-configured SDL gamepad support."),
     preset!("lime3ds", "Lime3DS", ["n3ds"],
         ["lime3ds", "lime3ds-gui"], ["io.github.lime3ds.Lime3DS"], ["lime3ds"],
         "{settings} {rom}", ["fullscreen", "screenLayout", "resolutionScale", "render3d", "advanced"], ""),
     preset!("melonds", "melonDS", ["nds"],
         ["melonDS", "melonds"], ["net.kuribo64.melonDS"], ["melonds"],
-        "{settings} {rom}", ["fullscreen", "screenLayout", "bootMode", "resolutionScale", "advanced"], ""),
+        "{settings} {rom}",
+        ["fullscreen", "screenLayout", "screenRotation", "swapScreens", "screenGap", "bootMode", "resolutionScale", "graphicsApi", "scalingFilter", "vsync", "advanced"],
+        "Custom Nexus build with direct CLI flags for layout, sizing, rotation, screen gap/swap, OpenGL scale, and pre-configured SDL gamepad support."),
     preset!("mgba", "mGBA", ["gba", "gb", "gbc"],
         ["mgba-qt", "mgba"], ["io.mgba.mGBA"], ["mgba"],
         "{settings} {rom}", ["fullscreen"], ""),
@@ -271,10 +275,38 @@ pub fn detect(extra_dirs: &[String]) -> Vec<Emulator> {
     // AppImages and portable builds
     let home = dirs::home_dir().unwrap_or_default();
     let mut search: Vec<PathBuf> = extra_dirs.iter().map(PathBuf::from).collect();
-    for d in ["Applications", "AppImages", "Apps", "Emulators", "Emulation", ".local/bin", "Games", "Downloads"] {
+    for d in [
+        "Documents/Games/Emulators",
+        "Documents/Games",
+        "Applications",
+        "AppImages",
+        "Apps",
+        "Emulators",
+        "Emulation",
+        ".local/bin",
+        "Games",
+        "Downloads",
+    ] {
         search.push(home.join(d));
     }
     search.push(PathBuf::from("/opt"));
+    // First pass: native portable binaries (preferred over AppImages)
+    for dir in search.iter().filter(|d| d.is_dir()) {
+        for e in walkdir::WalkDir::new(dir).max_depth(3).follow_links(true).into_iter().flatten() {
+            if !e.file_type().is_file() && !e.file_type().is_symlink() {
+                continue;
+            }
+            let name = e.file_name().to_string_lossy().to_string();
+            let path = e.path();
+            for p in PRESETS {
+                if p.binaries.iter().any(|b| *b == name) && is_executable(path) {
+                    push(make(p, path.to_string_lossy().to_string(), "binary"), &mut found);
+                    break;
+                }
+            }
+        }
+    }
+    // Second pass: AppImages
     for dir in search.iter().filter(|d| d.is_dir()) {
         for e in walkdir::WalkDir::new(dir).max_depth(3).follow_links(true).into_iter().flatten() {
             if !e.file_type().is_file() && !e.file_type().is_symlink() {
@@ -285,10 +317,8 @@ pub fn detect(extra_dirs: &[String]) -> Vec<Emulator> {
             let path = e.path();
             for p in PRESETS {
                 let is_appimage = lower.ends_with(".appimage") && p.appimages.iter().any(|a| lower.starts_with(a));
-                let is_portable = p.binaries.iter().any(|b| *b == name) && is_executable(path);
-                if is_appimage || is_portable {
-                    let kind = if is_appimage { "appimage" } else { "binary" };
-                    push(make(p, path.to_string_lossy().to_string(), kind), &mut found);
+                if is_appimage {
+                    push(make(p, path.to_string_lossy().to_string(), "appimage"), &mut found);
                     break;
                 }
             }
@@ -551,22 +581,89 @@ pub fn build_command(emu: &Emulator, ctx: &BuildContext) -> Result<CommandSpec, 
                     _ => {}
                 }
             }
+            if let Some(layout) = s.screen_layout.as_deref() {
+                match layout {
+                    "top-bottom" => {
+                        settings_args.extend(["--layout".into(), "vertical".into(), "--sizing".into(), "even".into()]);
+                    }
+                    "side-by-side" => {
+                        settings_args.extend(["--layout".into(), "horizontal".into(), "--sizing".into(), "even".into()]);
+                    }
+                    "hybrid" => {
+                        settings_args.extend(["--layout".into(), "hybrid".into(), "--sizing".into(), "emph-top".into()]);
+                    }
+                    "large" | "emph-top" => {
+                        settings_args.extend(["--layout".into(), "natural".into(), "--sizing".into(), "emph-top".into()]);
+                    }
+                    "emph-bottom" => {
+                        settings_args.extend(["--layout".into(), "natural".into(), "--sizing".into(), "emph-bottom".into()]);
+                    }
+                    "single-top" => {
+                        settings_args.extend(["--layout".into(), "single-top".into()]);
+                    }
+                    "single-bottom" => {
+                        settings_args.extend(["--layout".into(), "single-bottom".into()]);
+                    }
+                    _ => {}
+                }
+            }
+            if let Some(rot) = s.screen_rotation {
+                settings_args.extend(["--rotation".into(), rot.to_string()]);
+            }
+            if let Some(swap) = s.swap_screens {
+                settings_args.extend(["--swap-screens".into(), if swap { "true" } else { "false" }.into()]);
+            }
+            if let Some(gap) = s.screen_gap {
+                settings_args.extend(["--gap".into(), gap.to_string()]);
+            }
+            if let Some(api) = s.graphics_api.as_deref() {
+                match api {
+                    "opengl" | "vulkan" => settings_args.extend(["--renderer".into(), "opengl".into()]),
+                    "software" => settings_args.extend(["--renderer".into(), "software".into()]),
+                    _ => {}
+                }
+            }
+            if let Some(scale) = s.resolution_scale {
+                settings_args.extend(["--scale".into(), scale.clamp(1, 16).to_string()]);
+            }
+            if let Some(filter) = s.scaling_filter.as_deref() {
+                match filter {
+                    "nearest" => {
+                        settings_args.extend(["--filter".into(), "nearest".into(), "--integer-scale".into(), "true".into()]);
+                    }
+                    "bilinear" | "bicubic" | "scaleforce" | "fsr" => {
+                        settings_args.extend(["--filter".into(), "linear".into()]);
+                    }
+                    _ => {}
+                }
+            }
+            if let Some(vsync) = s.vsync {
+                settings_args.extend(["--vsync".into(), if vsync { "true" } else { "false" }.into()]);
+            }
             if let Some(home) = dirs::home_dir() {
                 let toml_path = home.join(".config/melonDS/melonDS.toml");
                 let mut updates = Vec::new();
                 if let Some(layout) = s.screen_layout.as_deref() {
                     match layout {
                         "top-bottom" => {
-                            updates.push(("Instance0.Window0", "ScreenLayout", "0"));
-                            updates.push(("Instance0.Window0", "ScreenSizing", "0"));
-                        }
-                        "side-by-side" => {
                             updates.push(("Instance0.Window0", "ScreenLayout", "1"));
                             updates.push(("Instance0.Window0", "ScreenSizing", "0"));
                         }
-                        "hybrid" => {
+                        "side-by-side" => {
                             updates.push(("Instance0.Window0", "ScreenLayout", "2"));
+                            updates.push(("Instance0.Window0", "ScreenSizing", "0"));
+                        }
+                        "hybrid" => {
+                            updates.push(("Instance0.Window0", "ScreenLayout", "3"));
                             updates.push(("Instance0.Window0", "ScreenSizing", "1"));
+                        }
+                        "large" | "emph-top" => {
+                            updates.push(("Instance0.Window0", "ScreenLayout", "0"));
+                            updates.push(("Instance0.Window0", "ScreenSizing", "1"));
+                        }
+                        "emph-bottom" => {
+                            updates.push(("Instance0.Window0", "ScreenLayout", "0"));
+                            updates.push(("Instance0.Window0", "ScreenSizing", "2"));
                         }
                         "single-top" => {
                             updates.push(("Instance0.Window0", "ScreenLayout", "0"));
@@ -597,6 +694,60 @@ pub fn build_command(emu: &Emulator, ctx: &BuildContext) -> Result<CommandSpec, 
         "azahar" | "lime3ds" => {
             if fullscreen {
                 settings_args.push("-f".into());
+            } else {
+                settings_args.push("-w".into());
+            }
+            if emu.preset == "azahar" {
+                if let Some(layout) = s.screen_layout.as_deref() {
+                    settings_args.extend(["--layout".into(), layout.into()]);
+                }
+                if let Some(rot) = s.screen_rotation {
+                    settings_args.extend(["--rotation".into(), rot.to_string()]);
+                }
+                if let Some(swap) = s.swap_screens {
+                    settings_args.extend(["--swap-screens".into(), if swap { "1" } else { "0" }.into()]);
+                }
+                if let Some(gap) = s.screen_gap {
+                    settings_args.extend(["--gap".into(), gap.to_string()]);
+                }
+                if let Some(scale) = s.resolution_scale {
+                    settings_args.extend(["--scale".into(), scale.clamp(1, 10).to_string()]);
+                }
+                if let Some(api) = s.graphics_api.as_deref() {
+                    settings_args.extend(["--graphics-api".into(), api.into()]);
+                }
+                if let Some(filter) = s.scaling_filter.as_deref() {
+                    let f = match filter {
+                        "scaleforce" => "scaleforce",
+                        "bicubic" => "bicubic",
+                        "fsr" => "anime4k",
+                        "bilinear" => "linear",
+                        "nearest" => "nearest",
+                        other => other,
+                    };
+                    settings_args.extend(["--filter".into(), f.into()]);
+                }
+                if let Some(aspect) = s.aspect_ratio.as_deref() {
+                    let a = match aspect {
+                        "auto" => "default",
+                        other => other,
+                    };
+                    settings_args.extend(["--aspect-ratio".into(), a.into()]);
+                }
+                if let Some(vsync) = s.vsync {
+                    settings_args.extend(["--vsync".into(), if vsync { "1" } else { "0" }.into()]);
+                }
+                if let Some(r3d) = s.render_3d.as_deref() {
+                    let m = match r3d {
+                        "side-by-side" => "sbs",
+                        "anaglyph" => "anaglyph",
+                        _ => "off",
+                    };
+                    settings_args.extend(["--3d-mode".into(), m.into()]);
+                }
+                if let Some(oc) = s.cpu_overclock {
+                    settings_args.extend(["--cpu-clock".into(), oc.to_string()]);
+                }
             }
             if let Some(home) = dirs::home_dir() {
                 let emu_name = if emu.preset == "lime3ds" { "lime3ds" } else { "azahar-emu" };
@@ -606,21 +757,38 @@ pub fn build_command(emu: &Emulator, ctx: &BuildContext) -> Result<CommandSpec, 
                 if let Some(layout) = s.screen_layout.as_deref() {
                     let opt = match layout {
                         "top-bottom" => "0",
-                        "single-top" => "1",
-                        "hybrid" => "2",
+                        "single-top" | "single-bottom" => "1",
+                        "large" | "emph-top" | "emph-bottom" => "2",
                         "side-by-side" => "3",
                         "separate" => "4",
+                        "hybrid" => "5",
                         _ => "0",
                     };
                     updates.push(("Layout", "layout_option", opt));
                     updates.push(("Layout", "layout_option\\default", "false"));
                     updates.push(("Layout", "layout_option\\use_global", "false"));
+                    if layout == "single-bottom" || layout == "emph-bottom" {
+                        updates.push(("Layout", "swap_screen", "true"));
+                        updates.push(("Layout", "swap_screen\\default", "false"));
+                        updates.push(("Layout", "swap_screen\\use_global", "false"));
+                    }
+                }
+                if let Some(swap) = s.swap_screens {
+                    updates.push(("Layout", "swap_screen", if swap { "true" } else { "false" }));
+                    updates.push(("Layout", "swap_screen\\default", "false"));
+                    updates.push(("Layout", "swap_screen\\use_global", "false"));
+                }
+                if let Some(rot) = s.screen_rotation {
+                    let upright = rot == 90 || rot == 270;
+                    updates.push(("Layout", "upright_screen", if upright { "true" } else { "false" }));
+                    updates.push(("Layout", "upright_screen\\default", "false"));
+                    updates.push(("Layout", "upright_screen\\use_global", "false"));
                 }
                 if let Some(r3d) = s.render_3d.as_deref() {
                     let opt = match r3d {
                         "off" => "0",
                         "side-by-side" => "1",
-                        "anaglyph" => "2",
+                        "anaglyph" => "3",
                         _ => "0",
                     };
                     updates.push(("Layout", "render_3d", opt));

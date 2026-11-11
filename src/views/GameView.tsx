@@ -253,6 +253,8 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
         "top-bottom",
         "side-by-side",
         "hybrid",
+        "large",
+        "emph-bottom",
         "single-top",
         "single-bottom",
         "separate",
@@ -260,7 +262,9 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
       const layoutLabels: Record<string, string> = {
         "top-bottom": "Top / Bottom (Vertical)",
         "side-by-side": "Side by Side (Horizontal)",
-        "hybrid": "Hybrid (Main Large / Sub Small)",
+        "hybrid": "Hybrid (Main + Both Stacked)",
+        "large": "Large Top + Small Bottom",
+        "emph-bottom": "Large Bottom + Small Top",
         "single-top": "Top Screen Only",
         "single-bottom": "Touch / Bottom Screen Only",
         "separate": "Separate Windows",
@@ -270,7 +274,7 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
         id: "screenLayout",
         group: "Graphics & Display",
         label: "Dual Screen Layout",
-        hint: "Screen orientation and layout for dual-screen systems",
+        hint: "Screen arrangement and sizing (Press R3 in-game to cycle)",
         valueLabel: s.screenLayout
           ? layoutLabels[s.screenLayout] || s.screenLayout
           : "Default (Console Standard)",
@@ -278,6 +282,66 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
         onStep: (dir) => updateSettings({ screenLayout: cycle(layouts, s.screenLayout ?? null, dir) }),
         onActivate: () => updateSettings({ screenLayout: cycle(layouts, s.screenLayout ?? null, 1) }),
         onClear: () => updateSettings({ screenLayout: null }),
+      });
+
+      const rotations: (number | null)[] = [null, 0, 90, 180, 270];
+      const rotLabels: Record<number, string> = {
+        0: "0° (Standard Landscape)",
+        90: "90° (Book Mode · Right)",
+        180: "180° (Inverted)",
+        270: "270° (Book Mode · Left)",
+      };
+      rows.push({
+        id: "screenRotation",
+        group: "Graphics & Display",
+        label: "Screen Rotation",
+        hint: "Rotate dual screens for book-style games (e.g. Hotel Dusk, Ninja Gaiden, Brain Age)",
+        valueLabel:
+          s.screenRotation !== null && s.screenRotation !== undefined
+            ? rotLabels[s.screenRotation] || `${s.screenRotation}°`
+            : "Default (0° Standard)",
+        isOverridden: s.screenRotation !== null && s.screenRotation !== undefined,
+        onStep: (dir) =>
+          updateSettings({ screenRotation: cycle(rotations, s.screenRotation ?? null, dir) }),
+        onActivate: () =>
+          updateSettings({ screenRotation: cycle(rotations, s.screenRotation ?? null, 1) }),
+        onClear: () => updateSettings({ screenRotation: null }),
+      });
+
+      const swapChoices: (boolean | null)[] = [null, true, false];
+      rows.push({
+        id: "swapScreens",
+        group: "Graphics & Display",
+        label: "Swap Top & Bottom Screens",
+        hint: "Invert primary and touch screens (Press L3 in-game to toggle)",
+        valueLabel:
+          s.swapScreens === true
+            ? "Swapped (Bottom Primary)"
+            : s.swapScreens === false
+              ? "Normal (Top Primary)"
+              : "Default (Normal)",
+        isOverridden: s.swapScreens !== null && s.swapScreens !== undefined,
+        onStep: (dir) =>
+          updateSettings({ swapScreens: cycle(swapChoices, s.swapScreens ?? null, dir) }),
+        onActivate: () =>
+          updateSettings({ swapScreens: cycle(swapChoices, s.swapScreens ?? null, 1) }),
+        onClear: () => updateSettings({ swapScreens: null }),
+      });
+
+      const gaps: (number | null)[] = [null, 0, 8, 16, 32, 64, 90];
+      rows.push({
+        id: "screenGap",
+        group: "Graphics & Display",
+        label: "Screen Hinge Gap",
+        hint: "Vertical spacing in pixels between top and bottom screens",
+        valueLabel:
+          s.screenGap !== null && s.screenGap !== undefined
+            ? `${s.screenGap} px`
+            : "Default (0 px Seamless)",
+        isOverridden: s.screenGap !== null && s.screenGap !== undefined,
+        onStep: (dir) => updateSettings({ screenGap: cycle(gaps, s.screenGap ?? null, dir) }),
+        onActivate: () => updateSettings({ screenGap: cycle(gaps, s.screenGap ?? null, 1) }),
+        onClear: () => updateSettings({ screenGap: null }),
       });
     }
 

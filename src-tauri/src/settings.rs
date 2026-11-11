@@ -20,8 +20,14 @@ pub struct GameSettings {
     pub fps_limit: Option<u32>,
     /// "auto" | "4:3" | "16:9" | "stretch"
     pub aspect_ratio: Option<String>,
-    /// Dual screen layout: "top-bottom" | "side-by-side" | "hybrid" | "single-top" | "single-bottom" | "separate"
+    /// Dual screen layout: "top-bottom" | "side-by-side" | "hybrid" | "large" | "emph-bottom" | "single-top" | "single-bottom" | "separate"
     pub screen_layout: Option<String>,
+    /// Dual screen rotation in degrees: 0 | 90 | 180 | 270
+    pub screen_rotation: Option<u16>,
+    /// Swap top and bottom screens
+    pub swap_screens: Option<bool>,
+    /// Gap in pixels between dual screens
+    pub screen_gap: Option<u16>,
     pub fullscreen: Option<bool>,
     /// Nintendo Switch mode: true = Docked (1080p), false = Handheld (720p).
     pub docked_mode: Option<bool>,
@@ -72,9 +78,10 @@ impl GameSettings {
         let mut out = self.clone();
         merge_fields!(
             out, over, emulator_id, core, graphics_api, resolution_scale, vsync, fps_limit,
-            aspect_ratio, screen_layout, fullscreen, docked_mode, scaling_filter, boot_mode,
-            render_3d, cpu_overclock, input_profile, launch_args, env, gamemode, mangohud,
-            gamescope, gamescope_args, config_overrides, mods_enabled, mod_links, advanced
+            aspect_ratio, screen_layout, screen_rotation, swap_screens, screen_gap, fullscreen,
+            docked_mode, scaling_filter, boot_mode, render_3d, cpu_overclock, input_profile,
+            launch_args, env, gamemode, mangohud, gamescope, gamescope_args, config_overrides,
+            mods_enabled, mod_links, advanced
         );
         out
     }

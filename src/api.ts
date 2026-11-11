@@ -57,6 +57,9 @@ export interface GameSettings {
   fpsLimit?: number | null;
   aspectRatio?: string | null;
   screenLayout?: string | null;
+  screenRotation?: number | null;
+  swapScreens?: boolean | null;
+  screenGap?: number | null;
   fullscreen?: boolean | null;
   dockedMode?: boolean | null;
   scalingFilter?: string | null;
