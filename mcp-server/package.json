@@ -1,0 +1,12 @@
+{
+  "name": "nexus-wayland-tester",
+  "version": "0.1.0",
+  "description": "MCP server to connect to, automate, and test Nexus Launcher on Wayland",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node test-runner.js"
+  },
+  "author": "Nexus Team",
+  "license": "MIT"
+}

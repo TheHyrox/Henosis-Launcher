@@ -1,0 +1,631 @@
+//! Emulator presets, auto-detection and command-line construction.
+
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
+
+use serde::Serialize;
+
+use crate::models::{Emulator, Game};
+use crate::settings::GameSettings;
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Preset {
+    pub id: &'static str,
+    pub name: &'static str,
+    pub platforms: &'static [&'static str],
+    pub binaries: &'static [&'static str],
+    pub flatpaks: &'static [&'static str],
+    /// Lowercase filename prefixes for AppImages.
+    pub appimages: &'static [&'static str],
+    pub args: &'static str,
+    /// Generic settings this emulator can receive from the launcher.
+    pub supports: &'static [&'static str],
+    pub notes: &'static str,
+}
+
+macro_rules! preset {
+    ($id:expr, $name:expr, [$($p:expr),*], [$($b:expr),*], [$($f:expr),*], [$($a:expr),*], $args:expr, [$($s:expr),*], $notes:expr) => {
+        Preset { id: $id, name: $name, platforms: &[$($p),*], binaries: &[$($b),*], flatpaks: &[$($f),*],
+                 appimages: &[$($a),*], args: $args, supports: &[$($s),*], notes: $notes }
+    };
+}
+
+pub static PRESETS: &[Preset] = &[
+    preset!("retroarch", "RetroArch",
+        ["nes", "snes", "n64", "gb", "gbc", "gba", "nds", "virtualboy", "psx", "psp", "mastersystem", "megadrive",
+         "segacd", "sega32x", "gamegear", "saturn", "dreamcast", "arcade", "neogeo", "ngp", "pcengine", "pcenginecd",
+         "3do", "atari2600", "atari7800", "lynx", "jaguar", "wonderswan", "msx", "c64", "pokemini"],
+        ["retroarch"], ["org.libretro.RetroArch"], ["retroarch"],
+        "-L {core} {settings} {rom}",
+        ["core", "graphicsApi", "vsync", "aspectRatio", "fullscreen", "advanced"],
+        "Per-game options are written to a temporary config passed with --appendconfig. Advanced lines use RetroArch cfg syntax: key = \"value\"."),
+    preset!("duckstation", "DuckStation", ["psx"],
+        ["duckstation-qt", "duckstation"], ["org.duckstation.DuckStation"], ["duckstation"],
+        "{settings} -batch -- {rom}", ["fullscreen"],
+        "DuckStation keeps its own per-game settings (Game Properties); the launcher controls fullscreen/batch mode."),
+    preset!("pcsx2", "PCSX2", ["ps2"],
+        ["pcsx2-qt", "pcsx2"], ["net.pcsx2.PCSX2"], ["pcsx2"],
+        "{settings} -batch -- {rom}", ["fullscreen"],
+        "PCSX2 stores per-game settings in its gamesettings folder; use Config Overrides for full control."),
+    preset!("rpcs3", "RPCS3", ["ps3"],
+        ["rpcs3"], ["net.rpcs3.RPCS3"], ["rpcs3"],
+        "--no-gui {settings} {rom}", ["advanced"],
+        "Advanced entries are passed as raw arguments (e.g. --config /path/custom.yml)."),
+    preset!("ppsspp", "PPSSPP", ["psp"],
+        ["PPSSPPSDL", "ppsspp", "PPSSPPQt", "ppsspp-sdl", "ppsspp-qt"], ["org.ppsspp.PPSSPP"], ["ppsspp"],
+        "{settings} {rom}", ["fullscreen", "graphicsApi"], ""),
+    preset!("vita3k", "Vita3K", ["psvita"],
+        ["Vita3K", "vita3k"], [], ["vita3k"],
+        "{settings} {rom}", ["fullscreen"],
+        "Installed titles are launched by title id (-r). Unrecognised items are passed as a path."),
+    preset!("dolphin", "Dolphin", ["gc", "wii"],
+        ["dolphin-emu", "dolphin-emu-nogui"], ["org.DolphinEmu.dolphin-emu"], ["dolphin"],
+        "-b {settings} -e {rom}",
+        ["graphicsApi", "resolutionScale", "vsync", "aspectRatio", "fullscreen", "advanced"],
+        "Settings are applied through Dolphin -C overrides (never written to your global config). Advanced: System.Section.Key=Value."),
+    preset!("cemu", "Cemu", ["wiiu"],
+        ["cemu", "Cemu"], ["info.cemu.Cemu"], ["cemu"],
+        "{settings} -g {rom}", ["fullscreen"], ""),
+    preset!("ryujinx", "Ryujinx (Ryubing)", ["switch"],
+        ["ryujinx", "Ryujinx"], ["io.github.ryubing.Ryujinx", "org.ryujinx.Ryujinx"], ["ryujinx", "ryubing"],
+        "{settings} {rom}", ["fullscreen", "graphicsApi"], ""),
+    preset!("eden", "Eden", ["switch"],
+        ["eden", "eden-cli"], ["dev.eden_emu.eden"], ["eden"],
+        "{settings} -g {rom}", ["fullscreen"], ""),
+    preset!("citron", "Citron", ["switch"],
+        ["citron"], ["org.citron_emu.citron"], ["citron"],
+        "{settings} -g {rom}", ["fullscreen"], ""),
+    preset!("sudachi", "Sudachi", ["switch"],
+        ["sudachi"], [], ["sudachi"],
+        "{settings} -g {rom}", ["fullscreen"], ""),
+    preset!("azahar", "Azahar", ["n3ds"],
+        ["azahar", "azahar-qt"], ["org.azahar_emu.Azahar"], ["azahar"],
+        "{settings} {rom}", ["fullscreen"], ""),
+    preset!("lime3ds", "Lime3DS", ["n3ds"],
+        ["lime3ds", "lime3ds-gui"], ["io.github.lime3ds.Lime3DS"], ["lime3ds"],
+        "{settings} {rom}", ["fullscreen"], ""),
+    preset!("melonds", "melonDS", ["nds"],
+        ["melonDS", "melonds"], ["net.kuribo64.melonDS"], ["melonds"],
+        "{settings} {rom}", ["fullscreen"], ""),
+    preset!("mgba", "mGBA", ["gba", "gb", "gbc"],
+        ["mgba-qt", "mgba"], ["io.mgba.mGBA"], ["mgba"],
+        "{settings} {rom}", ["fullscreen"], ""),
+    preset!("flycast", "Flycast", ["dreamcast", "arcade"],
+        ["flycast"], ["org.flycast.Flycast"], ["flycast"],
+        "{settings} {rom}", ["fullscreen", "advanced"],
+        "Advanced entries become -config section:key=value overrides."),
+    preset!("xemu", "xemu", ["xbox"],
+        ["xemu"], ["app.xemu.xemu"], ["xemu"],
+        "{settings} -dvd_path {rom}", ["fullscreen"],
+        "Requires your own MCPX boot ROM, flash BIOS and HDD image configured inside xemu."),
+    preset!("xenia", "Xenia Canary", ["xbox360"],
+        ["xenia_canary", "xenia-canary", "xenia"], [], ["xenia"],
+        "{settings} {rom}", ["fullscreen"],
+        "The Linux build is experimental; you can also point this to a Wine wrapper script."),
+    preset!("mednafen", "Mednafen", ["psx", "saturn", "pcengine", "pcenginecd", "gb", "gbc", "gba", "nes", "snes",
+        "megadrive", "mastersystem", "gamegear", "lynx", "ngp", "wonderswan", "virtualboy"],
+        ["mednafen"], [], [], "{settings} {rom}", ["fullscreen"], ""),
+    preset!("mame", "MAME", ["arcade", "neogeo"],
+        ["mame"], ["org.mamedev.MAME"], [],
+        "{settings} -rompath {rom_dir} {rom_stem}", ["fullscreen"], ""),
+    preset!("custom", "Custom Emulator", [], [], [], [], "{rom}", ["advanced"],
+        "Any executable. Tokens: {rom} {path} {rom_dir} {rom_stem} {bios} {serial} {settings}."),
+];
+
+pub fn preset(id: &str) -> Option<&'static Preset> {
+    PRESETS.iter().find(|p| p.id == id)
+}
+
+/// Preferred RetroArch cores per platform (first installed wins).
+pub fn default_cores(platform: &str) -> &'static [&'static str] {
+    match platform {
+        "nes" => &["mesen", "nestopia", "fceumm", "quicknes"],
+        "snes" => &["snes9x", "bsnes", "bsnes_hd_beta", "mesen-s"],
+        "n64" => &["mupen64plus_next", "parallel_n64"],
+        "gb" | "gbc" => &["gambatte", "sameboy", "gearboy", "mgba"],
+        "gba" => &["mgba", "vba_next", "vbam", "gpsp"],
+        "nds" => &["melondsds", "melonds", "desmume"],
+        "virtualboy" => &["mednafen_vb"],
+        "psx" => &["swanstation", "mednafen_psx_hw", "mednafen_psx", "pcsx_rearmed"],
+        "psp" => &["ppsspp"],
+        "mastersystem" | "megadrive" | "segacd" | "gamegear" => &["genesis_plus_gx", "picodrive"],
+        "sega32x" => &["picodrive"],
+        "saturn" => &["mednafen_saturn", "yabasanshiro", "kronos"],
+        "dreamcast" => &["flycast"],
+        "arcade" => &["fbneo", "mame", "mame2003_plus"],
+        "neogeo" => &["fbneo", "geolith"],
+        "ngp" => &["mednafen_ngp"],
+        "pcengine" | "pcenginecd" => &["mednafen_pce", "mednafen_pce_fast"],
+        "3do" => &["opera"],
+        "atari2600" => &["stella", "stella2014"],
+        "atari7800" => &["prosystem"],
+        "lynx" => &["handy", "mednafen_lynx"],
+        "jaguar" => &["virtualjaguar"],
+        "wonderswan" => &["mednafen_wswan"],
+        "msx" => &["bluemsx", "fmsx"],
+        "c64" => &["vice_x64sc", "vice_x64"],
+        "pokemini" => &["pokemini"],
+        _ => &[],
+    }
+}
+
+pub fn default_cores_dirs(emu: &Emulator) -> Vec<PathBuf> {
+    let mut dirs_out = Vec::new();
+    if let Some(d) = &emu.cores_dir {
+        dirs_out.push(PathBuf::from(d));
+    }
+    if let Some(home) = dirs::home_dir() {
+        if emu.kind == "flatpak" {
+            dirs_out.push(home.join(".var/app/org.libretro.RetroArch/config/retroarch/cores"));
+        }
+        dirs_out.push(home.join(".config/retroarch/cores"));
+    }
+    dirs_out.push(PathBuf::from("/usr/lib/libretro"));
+    dirs_out.push(PathBuf::from("/usr/lib64/libretro"));
+    dirs_out
+}
+
+/// List installed RetroArch core names for an emulator entry.
+pub fn installed_cores(emu: &Emulator) -> Vec<String> {
+    let mut set = HashSet::new();
+    for d in default_cores_dirs(emu) {
+        if let Ok(rd) = std::fs::read_dir(d) {
+            for e in rd.flatten() {
+                let n = e.file_name().to_string_lossy().to_string();
+                if let Some(core) = n.strip_suffix("_libretro.so") {
+                    set.insert(core.to_string());
+                }
+            }
+        }
+    }
+    let mut v: Vec<String> = set.into_iter().collect();
+    v.sort();
+    v
+}
+
+fn find_core(emu: &Emulator, name: &str) -> Option<PathBuf> {
+    default_cores_dirs(emu).into_iter().map(|d| d.join(format!("{name}_libretro.so"))).find(|p| p.is_file())
+}
+
+// ── Detection ───────────────────────────────────────────────────────────────
+
+fn short_hash(s: &str) -> String {
+    let mut h: u64 = 1469598103934665603;
+    for b in s.bytes() {
+        h ^= b as u64;
+        h = h.wrapping_mul(1099511628211);
+    }
+    format!("{:08x}", (h >> 32) as u32)
+}
+
+fn make(preset: &Preset, exec: String, kind: &str) -> Emulator {
+    let label = match kind {
+        "flatpak" => format!("{} (Flatpak)", preset.name),
+        "appimage" => format!("{} (AppImage)", preset.name),
+        _ => preset.name.to_string(),
+    };
+    Emulator {
+        id: format!("{}-{}", preset.id, short_hash(&exec)),
+        preset: preset.id.to_string(),
+        name: label,
+        exec,
+        kind: kind.to_string(),
+        version: None,
+        platforms: preset.platforms.iter().map(|s| s.to_string()).collect(),
+        args: preset.args.to_string(),
+        workdir: None,
+        cores_dir: None,
+    }
+}
+
+fn is_executable(p: &Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    p.is_file() && p.metadata().map(|m| m.permissions().mode() & 0o111 != 0).unwrap_or(false)
+}
+
+pub fn which(bin: &str) -> Option<PathBuf> {
+    let path = std::env::var_os("PATH")?;
+    std::env::split_paths(&path).map(|d| d.join(bin)).find(|p| is_executable(p))
+}
+
+pub fn flatpak_apps() -> HashSet<String> {
+    std::process::Command::new("flatpak")
+        .args(["list", "--app", "--columns=application"])
+        .output()
+        .ok()
+        .map(|o| String::from_utf8_lossy(&o.stdout).lines().map(|l| l.trim().to_string()).collect())
+        .unwrap_or_default()
+}
+
+/// Scan PATH, Flatpak and the given folders (plus common AppImage folders) for known emulators.
+pub fn detect(extra_dirs: &[String]) -> Vec<Emulator> {
+    let mut found: Vec<Emulator> = Vec::new();
+    let mut seen_exec = HashSet::new();
+    let mut push = |e: Emulator, found: &mut Vec<Emulator>| {
+        if seen_exec.insert(e.exec.clone()) {
+            found.push(e);
+        }
+    };
+
+    // System binaries
+    for p in PRESETS {
+        for b in p.binaries {
+            if let Some(path) = which(b) {
+                push(make(p, path.to_string_lossy().to_string(), "binary"), &mut found);
+                break;
+            }
+        }
+    }
+
+    // Flatpaks
+    let flatpaks = flatpak_apps();
+    for p in PRESETS {
+        for f in p.flatpaks {
+            if flatpaks.contains(*f) {
+                push(make(p, f.to_string(), "flatpak"), &mut found);
+            }
+        }
+    }
+
+    // AppImages and portable builds
+    let home = dirs::home_dir().unwrap_or_default();
+    let mut search: Vec<PathBuf> = extra_dirs.iter().map(PathBuf::from).collect();
+    for d in ["Applications", "AppImages", "Apps", "Emulators", "Emulation", ".local/bin", "Games", "Downloads"] {
+        search.push(home.join(d));
+    }
+    search.push(PathBuf::from("/opt"));
+    for dir in search.iter().filter(|d| d.is_dir()) {
+        for e in walkdir::WalkDir::new(dir).max_depth(3).follow_links(true).into_iter().flatten() {
+            if !e.file_type().is_file() && !e.file_type().is_symlink() {
+                continue;
+            }
+            let name = e.file_name().to_string_lossy().to_string();
+            let lower = name.to_lowercase();
+            let path = e.path();
+            for p in PRESETS {
+                let is_appimage = lower.ends_with(".appimage") && p.appimages.iter().any(|a| lower.starts_with(a));
+                let is_portable = p.binaries.iter().any(|b| *b == name) && is_executable(path);
+                if is_appimage || is_portable {
+                    let kind = if is_appimage { "appimage" } else { "binary" };
+                    push(make(p, path.to_string_lossy().to_string(), kind), &mut found);
+                    break;
+                }
+            }
+        }
+    }
+    found
+}
+
+// ── Command construction ────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommandSpec {
+    pub program: String,
+    pub args: Vec<String>,
+    pub env: Vec<(String, String)>,
+    pub workdir: Option<String>,
+}
+
+impl CommandSpec {
+    pub fn display(&self) -> String {
+        let mut parts: Vec<String> = self.env.iter().map(|(k, v)| format!("{k}={}", quote(v))).collect();
+        parts.push(quote(&self.program));
+        parts.extend(self.args.iter().map(|a| quote(a)));
+        parts.join(" ")
+    }
+}
+
+fn quote(s: &str) -> String {
+    if s.chars().any(|c| c.is_whitespace() || "'\"$&|;<>()".contains(c)) {
+        format!("'{}'", s.replace('\'', "'\\''"))
+    } else {
+        s.to_string()
+    }
+}
+
+/// Split a command-line template into words, honouring single/double quotes.
+pub fn shell_split(s: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut cur = String::new();
+    let mut in_word = false;
+    let mut quote: Option<char> = None;
+    let mut chars = s.chars();
+    while let Some(c) = chars.next() {
+        match (quote, c) {
+            (Some(q), c) if c == q => quote = None,
+            (Some('"'), '\\') => {
+                if let Some(n) = chars.next() {
+                    cur.push(n);
+                }
+            }
+            (Some(_), c) => cur.push(c),
+            (None, '"') | (None, '\'') => {
+                quote = Some(c);
+                in_word = true;
+            }
+            (None, '\\') => {
+                if let Some(n) = chars.next() {
+                    cur.push(n);
+                    in_word = true;
+                }
+            }
+            (None, c) if c.is_whitespace() => {
+                if in_word {
+                    out.push(std::mem::take(&mut cur));
+                    in_word = false;
+                }
+            }
+            (None, c) => {
+                cur.push(c);
+                in_word = true;
+            }
+        }
+    }
+    if in_word {
+        out.push(cur);
+    }
+    out
+}
+
+pub struct BuildContext<'a> {
+    pub game: &'a Game,
+    pub settings: &'a GameSettings,
+    pub bios_dir: Option<&'a str>,
+    /// Directory for temporary per-launch files.
+    pub run_dir: &'a Path,
+}
+
+/// Build the full command (wrappers + emulator + arguments) for a game.
+pub fn build_command(emu: &Emulator, ctx: &BuildContext) -> Result<CommandSpec, String> {
+    let game = ctx.game;
+    let s = ctx.settings;
+    let path = Path::new(&game.path);
+    let fullscreen = s.fullscreen.unwrap_or(true);
+    let mut env: Vec<(String, String)> = Vec::new();
+
+    // Adapter-specific settings arguments and target override
+    let mut settings_args: Vec<String> = Vec::new();
+    let mut target: Vec<String> = vec![game.path.clone()];
+    let mut core_path = String::new();
+
+    match emu.preset.as_str() {
+        "retroarch" => {
+            let candidates: Vec<String> = match &s.core {
+                Some(c) => vec![c.clone()],
+                None => default_cores(&game.platform).iter().map(|s| s.to_string()).collect(),
+            };
+            let core = candidates.iter().find_map(|c| find_core(emu, c)).ok_or_else(|| {
+                format!(
+                    "No RetroArch core found for this platform. Install one of: {}",
+                    if candidates.is_empty() { "(none known)".into() } else { candidates.join(", ") }
+                )
+            })?;
+            core_path = core.to_string_lossy().to_string();
+            let mut cfg = vec![format!("video_fullscreen = \"{fullscreen}\"")];
+            if let Some(api) = &s.graphics_api {
+                let driver = match api.as_str() {
+                    "vulkan" => "vulkan",
+                    "opengl" => "glcore",
+                    "software" => "sdl2",
+                    other => other,
+                };
+                cfg.push(format!("video_driver = \"{driver}\""));
+            }
+            if let Some(v) = s.vsync {
+                cfg.push(format!("video_vsync = \"{v}\""));
+            }
+            match s.aspect_ratio.as_deref() {
+                Some("auto") => cfg.push("video_aspect_ratio_auto = \"true\"".into()),
+                Some("4:3") => cfg.extend(["video_aspect_ratio_auto = \"false\"".into(), "aspect_ratio_index = \"0\"".into()]),
+                Some("16:9") => cfg.extend(["video_aspect_ratio_auto = \"false\"".into(), "aspect_ratio_index = \"1\"".into()]),
+                Some("stretch") => cfg.extend(["video_aspect_ratio_auto = \"false\"".into(), "video_scale_integer = \"false\"".into(), "aspect_ratio_index = \"24\"".into()]),
+                _ => {}
+            }
+            if let Some(adv) = &s.advanced {
+                cfg.extend(adv.iter().filter(|l| !l.trim().is_empty()).cloned());
+            }
+            std::fs::create_dir_all(ctx.run_dir).map_err(|e| e.to_string())?;
+            let file = ctx.run_dir.join(format!("retroarch-{}.cfg", game.id));
+            std::fs::write(&file, cfg.join("\n") + "\n").map_err(|e| e.to_string())?;
+            settings_args.push("--appendconfig".into());
+            settings_args.push(file.to_string_lossy().to_string());
+        }
+        "dolphin" => {
+            let mut c = |kv: String| {
+                settings_args.push("-C".into());
+                settings_args.push(kv);
+            };
+            c(format!("Dolphin.Display.Fullscreen={}", if fullscreen { "True" } else { "False" }));
+            if let Some(api) = &s.graphics_api {
+                let b = match api.as_str() {
+                    "vulkan" => "Vulkan",
+                    "opengl" => "OGL",
+                    "software" => "Software Renderer",
+                    o => o,
+                };
+                c(format!("Dolphin.Core.GFXBackend={b}"));
+            }
+            if let Some(scale) = s.resolution_scale {
+                c(format!("GFX.Settings.InternalResolution={}", scale.clamp(1, 8)));
+            }
+            if let Some(v) = s.vsync {
+                c(format!("GFX.Hardware.VSync={}", if v { "True" } else { "False" }));
+            }
+            if let Some(a) = s.aspect_ratio.as_deref() {
+                let idx = match a {
+                    "16:9" => 1,
+                    "4:3" => 2,
+                    "stretch" => 3,
+                    _ => 0,
+                };
+                c(format!("GFX.Settings.AspectRatio={idx}"));
+            }
+            for a in s.advanced.iter().flatten().filter(|l| !l.trim().is_empty()) {
+                c(a.clone());
+            }
+        }
+        "flycast" => {
+            if fullscreen {
+                settings_args.extend(["-config".into(), "window:fullscreen=yes".into()]);
+            }
+            for a in s.advanced.iter().flatten().filter(|l| !l.trim().is_empty()) {
+                settings_args.extend(["-config".into(), a.clone()]);
+            }
+        }
+        "duckstation" | "pcsx2" => settings_args.push(if fullscreen { "-fullscreen" } else { "-nofullscreen" }.into()),
+        "cemu" | "eden" | "citron" | "sudachi" | "azahar" | "lime3ds" | "melonds" | "mgba" => {
+            if fullscreen {
+                settings_args.push("-f".into());
+            }
+        }
+        "ryujinx" => {
+            if fullscreen {
+                settings_args.push("--fullscreen".into());
+            }
+            if let Some(api) = &s.graphics_api {
+                settings_args.push("--graphics-backend".into());
+                settings_args.push(if api == "opengl" { "OpenGl".into() } else { "Vulkan".into() });
+            }
+        }
+        "ppsspp" => {
+            if fullscreen {
+                settings_args.push("--fullscreen".into());
+            }
+            if let Some(api) = &s.graphics_api {
+                settings_args.push(format!("--graphics={}", if api == "opengl" { "opengl" } else { "vulkan" }));
+            }
+        }
+        "vita3k" => {
+            if fullscreen {
+                settings_args.push("-F".into());
+            }
+            if let Some(id) = &game.serial {
+                target = vec!["-r".into(), id.clone()];
+            }
+        }
+        "xemu" => {
+            if fullscreen {
+                settings_args.push("-full-screen".into());
+            }
+        }
+        "xenia" => {
+            if fullscreen {
+                settings_args.push("--fullscreen=true".into());
+            }
+        }
+        "mednafen" => {
+            settings_args.extend(["-video.fs".into(), if fullscreen { "1".into() } else { "0".into() }]);
+        }
+        "mame" => settings_args.push(if fullscreen { "-nowindow" } else { "-window" }.into()),
+        "rpcs3" => {
+            let eboot = path.join("PS3_GAME/USRDIR/EBOOT.BIN");
+            let hdd = path.join("USRDIR/EBOOT.BIN");
+            if eboot.is_file() {
+                target = vec![eboot.to_string_lossy().to_string()];
+            } else if hdd.is_file() {
+                target = vec![hdd.to_string_lossy().to_string()];
+            }
+            settings_args.extend(s.advanced.iter().flatten().filter(|l| !l.trim().is_empty()).cloned());
+        }
+        _ => {
+            settings_args.extend(s.advanced.iter().flatten().flat_map(|l| shell_split(l)));
+        }
+    }
+
+    // Expand the argument template
+    let rom_dir = path.parent().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
+    let rom_stem = path.file_stem().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
+    let mut args: Vec<String> = Vec::new();
+    for word in shell_split(&emu.args) {
+        match word.as_str() {
+            "{settings}" => args.extend(settings_args.iter().cloned()),
+            "{rom}" => args.extend(target.iter().cloned()),
+            _ => args.push(
+                word.replace("{path}", &game.path)
+                    .replace("{rom_dir}", &rom_dir)
+                    .replace("{rom_stem}", &rom_stem)
+                    .replace("{core}", &core_path)
+                    .replace("{bios}", ctx.bios_dir.unwrap_or(""))
+                    .replace("{serial}", game.serial.as_deref().unwrap_or(""))
+                    .replace("{rom}", &game.path),
+            ),
+        }
+    }
+    if let Some(extra) = &s.launch_args {
+        args.extend(shell_split(extra));
+    }
+
+    // Base program (Flatpak needs `flatpak run` and filesystem access to the game folder)
+    let (program, mut full_args) = match emu.kind.as_str() {
+        "flatpak" => {
+            let mut a = vec!["run".to_string()];
+            if !rom_dir.is_empty() {
+                let dir = if path.is_dir() { game.path.clone() } else { rom_dir.clone() };
+                a.push(format!("--filesystem={dir}:ro"));
+            }
+            if emu.preset == "retroarch" && !core_path.is_empty() {
+                if let Some(d) = Path::new(&core_path).parent() {
+                    a.push(format!("--filesystem={}:ro", d.to_string_lossy()));
+                }
+            }
+            a.push(emu.exec.clone());
+            ("flatpak".to_string(), a)
+        }
+        _ => (emu.exec.clone(), vec![]),
+    };
+    full_args.extend(args);
+
+    wrap(program, full_args, s, &mut env, emu.workdir.clone())
+}
+
+/// Apply environment variables and gamescope / gamemode / MangoHud wrappers.
+pub fn wrap(
+    program: String,
+    args: Vec<String>,
+    s: &GameSettings,
+    env: &mut Vec<(String, String)>,
+    workdir: Option<String>,
+) -> Result<CommandSpec, String> {
+    for kv in s.env.iter().flatten() {
+        if let Some((k, v)) = kv.split_once('=') {
+            if !k.trim().is_empty() {
+                env.push((k.trim().to_string(), v.to_string()));
+            }
+        }
+    }
+    let mut chain: Vec<String> = Vec::new();
+    if s.gamescope == Some(true) {
+        if which("gamescope").is_none() {
+            return Err("gamescope is enabled but not installed".into());
+        }
+        chain.push("gamescope".into());
+        let gs_args = s.gamescope_args.clone().unwrap_or_else(|| "-f".into());
+        chain.extend(shell_split(&gs_args));
+        if let Some(fps) = s.fps_limit.filter(|f| *f > 0) {
+            chain.extend(["-r".into(), fps.to_string()]);
+        }
+        chain.push("--".into());
+    }
+    if s.gamemode == Some(true) && which("gamemoderun").is_some() {
+        chain.push("gamemoderun".into());
+    }
+    if s.mangohud == Some(true) && which("mangohud").is_some() {
+        chain.push("mangohud".into());
+        if s.gamescope != Some(true) {
+            if let Some(fps) = s.fps_limit.filter(|f| *f > 0) {
+                env.push(("MANGOHUD_CONFIG".into(), format!("fps_limit={fps}")));
+            }
+        }
+    }
+    let spec = if chain.is_empty() {
+        CommandSpec { program, args, env: env.clone(), workdir }
+    } else {
+        let p = chain.remove(0);
+        chain.push(program);
+        chain.extend(args);
+        CommandSpec { program: p, args: chain, env: env.clone(), workdir }
+    };
+    Ok(spec)
+}
