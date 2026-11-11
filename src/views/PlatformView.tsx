@@ -1,14 +1,9 @@
-// Step 2 of the Console-First Experience: 3D Cover Flow Carousel & Console-Themed Environment.
-//
-// Directive implementations:
-// 1. Dynamic Console-Themed Environment:
-//    Adapts color palette and animated background (Wii U cyan wavy ribbons, Switch scarlet glowing waves,
-//    PlayStation navy/indigo atmosphere, Xbox 360 radiant emerald curves).
-// 2. 3D Physical Media Rendering:
-//    Fully rendered 3D physical game cases with realistic spine thickness, plastic sheen, and glass floor reflections.
-// 3. Center Showcase (3D Cover Flow Carousel):
-//    Highlighted game is elevated and centered facing forward, adjacent titles angle inward with realistic perspective,
-//    depth of field blur, and smooth camera transitions.
+// Screens 2, 3 & 4 of the UI/UX Design System Specification:
+// - Screen 2: 3D Cartridge / Disc Coverflow View (3D physical media, showroom floor reflection, 45° inward flanking spines)
+// - Screen 3: High-Density Grid / Poster Wall View (adaptive 1:1 / 3:4 / 2:3 aspect ratios, 3px neon focus ring, scale(1.08),
+//             40% opacity 60px blurred background crossfade, fixed bottom preview card, 4-way spatial D-Pad + LT/RT 2-row jump)
+// - Screen 4: Quick-Details Slide-Over Drawer (38% width right slide-over, 450ms cubic-bezier, left grid dimmed to 30% + 10px blur,
+//             vertical micro-hierarchy with 3D box art, green PLAY NOW (A), FULL DETAILS (X), 2-col specs, synopsis & stats)
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -17,6 +12,7 @@ import {
   formatPlaytime,
   formatRelativeDate,
   Game,
+  mediaSrc,
   Platform,
 } from "../api";
 import { CollectibleCard } from "../components/Collectible";
@@ -26,11 +22,27 @@ import { usePad } from "../input";
 import { useStore } from "../store";
 
 const SORTS = [
-  { id: "title", label: "Title A–Z" },
-  { id: "recent", label: "Recently Played" },
-  { id: "playtime", label: "Most Played" },
-  { id: "favorites", label: "Favorites First" },
+  { id: "title", label: "A–Z" },
+  { id: "recent", label: "Recent" },
+  { id: "playtime", label: "Playtime" },
+  { id: "favorites", label: "Favorites" },
 ] as const;
+
+const GRID_COLS = 7;
+
+function getPlatformPosterAspectClass(platformId: string): string {
+  const pid = platformId.toLowerCase();
+  // 1:1 square art (DS, 3DS, Game Boy, PS1 jewel cases, Saturn, Dreamcast, NGP, PokéMini)
+  if (["nds", "n3ds", "gb", "gbc", "psx", "dreamcast", "saturn", "ngp", "pokemini"].includes(pid)) {
+    return "poster-aspect-1-1";
+  }
+  // 3:4 classic cartridge box art (GBA, SNES, NES, N64, Mega Drive, Master System, Game Gear)
+  if (["gba", "snes", "nes", "n64", "megadrive", "mastersystem", "gamegear", "pcengine"].includes(pid)) {
+    return "poster-aspect-3-4";
+  }
+  // 2:3 vertical modern & PC/Steam box art
+  return "poster-aspect-2-3";
+}
 
 export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) => {
   const {
@@ -38,6 +50,8 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
     platformDefs,
     platformFocus,
     setPlatformFocus,
+    platformViewMode,
+    togglePlatformViewMode,
     navigate,
     replaceScreen,
     back,
@@ -53,7 +67,11 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
   const [sortIdx, setSortIdx] = useState(0);
   const [search, setSearch] = useState("");
   const [scraping, setScraping] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
   const stageRef = useRef<HTMLDivElement | null>(null);
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  const drawerDescRef = useRef<HTMLDivElement | null>(null);
 
   const platform: Platform | undefined = useMemo(
     () =>
@@ -73,6 +91,7 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
 
   useEffect(() => {
     loadGames();
+    setDrawerOpen(false);
   }, [platformId]);
 
   const visibleGames = useMemo(() => {
@@ -98,6 +117,15 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
   const savedFocus = platformFocus[platformId] ?? 0;
   const focusIdx = Math.min(savedFocus, Math.max(0, visibleGames.length - 1));
   const focusedGame = visibleGames[focusIdx] || null;
+
+  // Scroll focused grid poster into view smoothly
+  useEffect(() => {
+    if (platformViewMode !== "grid" || !gridRef.current) return;
+    const card = gridRef.current.querySelector<HTMLElement>(`[data-grid-idx="${focusIdx}"]`);
+    if (card) {
+      card.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+    }
+  }, [focusIdx, platformViewMode]);
 
   // Background auto-fetch of metadata & boxart for focused game if needed
   useEffect(() => {
@@ -127,9 +155,12 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
     if (next) replaceScreen({ kind: "platform", platformId: next.id });
   };
 
-  const toggleFavorite = async (g: Game) => {
-    await api.setGameFlag(g.id, "favorite", !g.favorite);
-    await loadGames();
+  // Alphabetical / 5-game jump for LB / RB in Coverflow
+  const jumpGames = (dir: -1 | 1) => {
+    if (visibleGames.length <= 1) return;
+    const step = Math.min(5, Math.max(1, Math.floor(visibleGames.length / 4)));
+    const nextIdx = Math.max(0, Math.min(visibleGames.length - 1, focusIdx + dir * step));
+    setPlatformFocus(platformId, nextIdx);
   };
 
   const handleScrapeAll = async () => {
@@ -168,7 +199,7 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
 
   const openSearch = () => {
     openKeyboard({
-      title: `Search ${platform?.name || "Library"} by Name`,
+      title: `Filter / Search ${platform?.name || "Library"}`,
       initial: search,
       placeholder: "Type game name…",
       onSubmit: (v) => {
@@ -178,6 +209,38 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
     });
   };
 
+  // Screen 4: Quick-Details Slide-Over Drawer Controller Handler (higher priority = 5)
+  usePad(
+    (btn) => {
+      if (!drawerOpen || !focusedGame) return false;
+      if (btn === "b") {
+        setDrawerOpen(false);
+        return true;
+      }
+      if (btn === "a") {
+        launchGame(focusedGame.id);
+        return true;
+      }
+      if (btn === "x") {
+        setDrawerOpen(false);
+        navigate({ kind: "game", gameId: focusedGame.id });
+        return true;
+      }
+      if (btn === "up") {
+        drawerDescRef.current?.scrollBy({ top: -48, behavior: "smooth" });
+        return true;
+      }
+      if (btn === "down") {
+        drawerDescRef.current?.scrollBy({ top: 48, behavior: "smooth" });
+        return true;
+      }
+      return true;
+    },
+    5,
+    drawerOpen
+  );
+
+  // Screen 2 (Coverflow) & Screen 3 (Grid) Controller Handler
   usePad((btn) => {
     if (btn === "b") {
       if (search) {
@@ -187,58 +250,126 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
       back();
       return true;
     }
-    if (btn === "lb") {
-      cyclePlatform(-1);
-      return true;
-    }
-    if (btn === "rb") {
-      cyclePlatform(1);
-      return true;
-    }
-    if (btn === "lt") {
-      setSortIdx((i) => (i - 1 + SORTS.length) % SORTS.length);
-      return true;
-    }
-    if (btn === "rt") {
-      setSortIdx((i) => (i + 1) % SORTS.length);
-      return true;
-    }
-    if (btn === "left") {
-      setPlatformFocus(platformId, Math.max(0, focusIdx - 1));
-      return true;
-    }
-    if (btn === "right") {
-      setPlatformFocus(platformId, Math.min(visibleGames.length - 1, focusIdx + 1));
-      return true;
-    }
-    if (btn === "a" && focusedGame) {
-      navigate({ kind: "game", gameId: focusedGame.id });
-      return true;
-    }
-    if (btn === "x" && focusedGame) {
-      launchGame(focusedGame.id);
+    if (btn === "select") {
+      // View Button: Toggles directly between 3D Coverflow and Grid View
+      togglePlatformViewMode();
+      setDrawerOpen(false);
       return true;
     }
     if (btn === "y") {
       openSearch();
       return true;
     }
-    if (btn === "select" && focusedGame) {
-      toggleFavorite(focusedGame);
-      return true;
-    }
     if (btn === "start") {
       setQuickMenu(true);
       return true;
+    }
+
+    if (platformViewMode === "coverflow") {
+      // Screen 2: 3D Coverflow Controller Mapping
+      if (btn === "left") {
+        setPlatformFocus(platformId, Math.max(0, focusIdx - 1));
+        return true;
+      }
+      if (btn === "right") {
+        setPlatformFocus(platformId, Math.min(visibleGames.length - 1, focusIdx + 1));
+        return true;
+      }
+      if (btn === "lb") {
+        jumpGames(-1);
+        return true;
+      }
+      if (btn === "rb") {
+        jumpGames(1);
+        return true;
+      }
+      if (btn === "lt") {
+        cyclePlatform(-1);
+        return true;
+      }
+      if (btn === "rt") {
+        setSortIdx((i) => (i + 1) % SORTS.length);
+        return true;
+      }
+      if (btn === "a" && focusedGame) {
+        launchGame(focusedGame.id);
+        return true;
+      }
+      if (btn === "x" && focusedGame) {
+        navigate({ kind: "game", gameId: focusedGame.id });
+        return true;
+      }
+    } else {
+      // Screen 3: High-Density Grid / Poster Wall Controller Mapping
+      if (btn === "left") {
+        setPlatformFocus(platformId, Math.max(0, focusIdx - 1));
+        return true;
+      }
+      if (btn === "right") {
+        setPlatformFocus(platformId, Math.min(visibleGames.length - 1, focusIdx + 1));
+        return true;
+      }
+      if (btn === "up") {
+        if (focusIdx - GRID_COLS >= 0) {
+          setPlatformFocus(platformId, focusIdx - GRID_COLS);
+        }
+        return true;
+      }
+      if (btn === "down") {
+        if (focusIdx + GRID_COLS < visibleGames.length) {
+          setPlatformFocus(platformId, focusIdx + GRID_COLS);
+        } else if (Math.floor(focusIdx / GRID_COLS) < Math.floor((visibleGames.length - 1) / GRID_COLS)) {
+          setPlatformFocus(platformId, visibleGames.length - 1);
+        }
+        return true;
+      }
+      if (btn === "lt") {
+        // Fast page scroll: jump 2 full rows up
+        setPlatformFocus(platformId, Math.max(0, focusIdx - GRID_COLS * 2));
+        return true;
+      }
+      if (btn === "rt") {
+        // Fast page scroll: jump 2 full rows down (or cycle sort if single row)
+        if (visibleGames.length > GRID_COLS) {
+          setPlatformFocus(platformId, Math.min(visibleGames.length - 1, focusIdx + GRID_COLS * 2));
+        } else {
+          setSortIdx((i) => (i + 1) % SORTS.length);
+        }
+        return true;
+      }
+      if (btn === "lb") {
+        cyclePlatform(-1);
+        return true;
+      }
+      if (btn === "rb") {
+        cyclePlatform(1);
+        return true;
+      }
+      if (btn === "a" && focusedGame) {
+        launchGame(focusedGame.id);
+        return true;
+      }
+      if (btn === "x" && focusedGame) {
+        setDrawerOpen(true);
+        return true;
+      }
     }
     return false;
   }, 0);
 
   if (!platform) return null;
 
+  const focusedFanArt =
+    mediaSrc(focusedGame?.hero) ||
+    mediaSrc(focusedGame?.metadata?.header) ||
+    mediaSrc(focusedGame?.cover);
+  const aspectClass = getPlatformPosterAspectClass(platform.id);
+
   return (
     <div
-      className="platform-coverflow-view"
+      className={`platform-coverflow-view mode-${platformViewMode} ${
+        drawerOpen ? "has-drawer-open" : ""
+      }`}
       style={
         {
           "--theme-color": platform.color,
@@ -248,6 +379,14 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
     >
       {/* Dynamic Console-Themed Environment Background */}
       <ConsoleEnvironment platformId={platform.id} />
+
+      {/* Screen 3: Dynamic Background Crossfade (40% opacity, 60px blurred copy of selected game's art) */}
+      {focusedFanArt && (
+        <div
+          className={`dynamic-art-crossfade ${platformViewMode === "grid" ? "is-grid-bg" : ""}`}
+          style={{ backgroundImage: `url("${focusedFanArt}")` }}
+        />
+      )}
 
       {/* Top Console Header Bar */}
       <header className="platform-header">
@@ -261,7 +400,11 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
               <span>·</span>
               <span>{platform.year}</span>
               <span>·</span>
-              <span>3D PHYSICAL MEDIA COLLECTION</span>
+              <span>
+                {platformViewMode === "coverflow"
+                  ? "3D CARTRIDGE / DISC COVERFLOW"
+                  : "HIGH-DENSITY POSTER WALL"}
+              </span>
             </div>
             <h1>
               {platform.name}{" "}
@@ -271,9 +414,21 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
         </div>
 
         <div className="platform-controls">
+          <button
+            className={`btn-view-toggle ${platformViewMode === "grid" ? "active" : ""}`}
+            onClick={() => {
+              togglePlatformViewMode();
+              setDrawerOpen(false);
+            }}
+            title="Toggle 3D Coverflow / Grid View (View / Select)"
+          >
+            <span className="xbox-btn btn-view">VIEW</span>
+            <span>{platformViewMode === "coverflow" ? "Toggle Grid" : "3D Coverflow"}</span>
+          </button>
+
           <button className="btn-search-prominent" onClick={openSearch}>
             <span className="xbox-btn btn-y">Y</span>
-            <span>{search ? `Search: "${search}"` : "Search by Name"}</span>
+            <span>{search ? `Filter: "${search}"` : "Filter"}</span>
           </button>
           {search && (
             <button className="btn-ghost" onClick={() => setSearch("")}>
@@ -284,17 +439,18 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
             className="btn-control"
             onClick={() => setSortIdx((i) => (i + 1) % SORTS.length)}
           >
-            ⇅ {SORTS[sortIdx].label} (RT)
+            <span className="xbox-btn btn-rt">RT</span>
+            <span>Sort: {SORTS[sortIdx].label}</span>
           </button>
           <button
             className="btn-control"
             onClick={handleScrapeAll}
             disabled={scraping}
           >
-            {scraping ? "Fetching Metadata…" : "✦ Fetch Metadata"}
+            {scraping ? "Scraping…" : "✦ Scrape Art"}
           </button>
           <button className="btn-control" onClick={promptAddGame}>
-            + Add Game
+            + Add ROM
           </button>
         </div>
       </header>
@@ -323,44 +479,59 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
             )}
           </div>
         </div>
-      ) : (
+      ) : platformViewMode === "coverflow" ? (
+        /* ═══════════════════════════════════════════════════════════════════════
+           SCREEN 2: 3D CARTRIDGE / DISC COVERFLOW VIEW
+           ═══════════════════════════════════════════════════════════════════════ */
         <div className="coverflow-layout">
+          {/* Center HUD Header: < SELECT GAME (17/25) > / Console Name / [PRESS (A) TO PLAY] */}
+          <div className="coverflow-hud-top">
+            <span className="coverflow-hud-counter">
+              &lt; SELECT GAME ({focusIdx + 1}/{visibleGames.length}) &gt;
+            </span>
+            <span className="coverflow-hud-console">{platform.name}</span>
+            {focusedGame && (
+              <button
+                className="coverflow-press-play-pill"
+                onClick={() => launchGame(focusedGame.id)}
+              >
+                [PRESS (A) TO PLAY]
+              </button>
+            )}
+          </div>
+
           {/* Center Showcase: 3D Cover Flow Carousel */}
           <section className="coverflow-stage-section">
             <div className="coverflow-stage" ref={stageRef}>
-              {/* Floor glass sheen & reflection surface */}
+              {/* Dynamic Floor Reflection: blurred mirror plane simulating showroom glass pedestal */}
               <div className="coverflow-glass-floor" />
 
               {visibleGames.map((g, idx) => {
                 const offset = idx - focusIdx;
-                // Only render items within visual range for 60+ FPS performance
                 if (Math.abs(offset) > 5) return null;
 
                 const isCenter = offset === 0;
                 const absOffset = Math.abs(offset);
 
-                // Cover Flow 3D Transform computation:
-                // Center item: elevated (-36px), translated forward (+170px), facing directly front (rotateY(0deg))
-                // Adjacent items: angled inward (52deg / -52deg), stepped along X and Z
+                // Active Hero State: elevated vertically, front-facing with 0deg Y-rotation
+                // Flanking titles: folded inward at 45° angles displaying their 3D spines
                 let transform = "";
                 let zIndex = 50 - absOffset;
                 let opacity = 1;
 
                 if (isCenter) {
-                  transform = `translateX(0px) translateY(-36px) translateZ(170px) rotateY(0deg) scale(1.42)`;
+                  transform = `translateX(0px) translateY(-28px) translateZ(170px) rotateY(0deg) scale(1.42)`;
                   zIndex = 100;
                   opacity = 1;
                 } else if (offset < 0) {
-                  // Left side items angled inward
                   const spacing = 240 + (absOffset - 1) * 115;
                   const depth = -80 - (absOffset - 1) * 55;
-                  transform = `translateX(-${spacing}px) translateY(0px) translateZ(${depth}px) rotateY(52deg) scale(1.08)`;
+                  transform = `translateX(-${spacing}px) translateY(0px) translateZ(${depth}px) rotateY(45deg) scale(1.08)`;
                   opacity = Math.max(0.42, 1 - absOffset * 0.14);
                 } else {
-                  // Right side items angled inward
                   const spacing = 240 + (absOffset - 1) * 115;
                   const depth = -80 - (absOffset - 1) * 55;
-                  transform = `translateX(${spacing}px) translateY(0px) translateZ(${depth}px) rotateY(-52deg) scale(1.08)`;
+                  transform = `translateX(${spacing}px) translateY(0px) translateZ(${depth}px) rotateY(-45deg) scale(1.08)`;
                   opacity = Math.max(0.42, 1 - absOffset * 0.14);
                 }
 
@@ -395,19 +566,27 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
 
             {/* Carousel navigation indicators */}
             <div className="coverflow-nav-indicator">
-              <span className="nav-arrow" onClick={() => setPlatformFocus(platformId, Math.max(0, focusIdx - 1))}>
+              <span
+                className="nav-arrow"
+                onClick={() => setPlatformFocus(platformId, Math.max(0, focusIdx - 1))}
+              >
                 ◀
               </span>
               <span className="nav-counter">
-                {focusIdx + 1} / {visibleGames.length}
+                {focusIdx + 1} / {visibleGames.length} · --- Floor Reflection ---
               </span>
-              <span className="nav-arrow" onClick={() => setPlatformFocus(platformId, Math.min(visibleGames.length - 1, focusIdx + 1))}>
+              <span
+                className="nav-arrow"
+                onClick={() =>
+                  setPlatformFocus(platformId, Math.min(visibleGames.length - 1, focusIdx + 1))
+                }
+              >
                 ▶
               </span>
             </div>
           </section>
 
-          {/* Focused Game Spotlight Information Panel - Sleek HUD Profile */}
+          {/* Focused Game Spotlight Information Panel */}
           {focusedGame && (
             <aside className="coverflow-spotlight-panel">
               <div className="spotlight-panel-inner">
@@ -460,19 +639,18 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
 
                   <div className="spotlight-panel-actions">
                     <button
-                      className="btn-play-showcase"
-                      style={{ background: platform.accent }}
+                      className="btn-play-emerald"
                       onClick={() => launchGame(focusedGame.id)}
                     >
-                      <span className="xbox-btn btn-x">X</span>
-                      <span>Play Now</span>
+                      <span className="xbox-btn btn-a">A</span>
+                      <span>Play Game</span>
                     </button>
                     <button
                       className="btn-details-showcase"
                       onClick={() => navigate({ kind: "game", gameId: focusedGame.id })}
                     >
-                      <span className="xbox-btn btn-a">A</span>
-                      <span>Details</span>
+                      <span className="xbox-btn btn-x">X</span>
+                      <span>Game Details</span>
                     </button>
                   </div>
                 </div>
@@ -480,43 +658,357 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
             </aside>
           )}
         </div>
+      ) : (
+        /* ═══════════════════════════════════════════════════════════════════════
+           SCREEN 3: HIGH-DENSITY GRID / POSTER WALL VIEW
+           + SCREEN 4: QUICK-DETAILS SLIDE-OVER DRAWER
+           ═══════════════════════════════════════════════════════════════════════ */
+        <div className="poster-grid-workspace">
+          {/* Left / Main Grid Container (Dimmed to 30% brightness & 10px blur when Drawer is open) */}
+          <div
+            className={`poster-grid-stage ${drawerOpen ? "is-dimmed-blurred" : ""}`}
+            onClick={() => {
+              if (drawerOpen) setDrawerOpen(false);
+            }}
+          >
+            <div className="poster-wall-scroll" ref={gridRef}>
+              <div className="poster-wall-grid">
+                {visibleGames.map((g, idx) => {
+                  const isFocused = idx === focusIdx;
+                  const coverUrl =
+                    mediaSrc(g.cover) || mediaSrc(g.metadata?.header) || mediaSrc(g.hero);
+                  return (
+                    <div
+                      key={g.id}
+                      data-grid-idx={idx}
+                      className={`poster-wall-card ${aspectClass} ${
+                        isFocused ? "is-focused" : ""
+                      }`}
+                      onMouseEnter={() => {
+                        if (!drawerOpen) setPlatformFocus(platformId, idx);
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (drawerOpen) {
+                          setPlatformFocus(platformId, idx);
+                          return;
+                        }
+                        if (isFocused) {
+                          setDrawerOpen(true);
+                        } else {
+                          setPlatformFocus(platformId, idx);
+                        }
+                      }}
+                      onDoubleClick={() => launchGame(g.id)}
+                    >
+                      <div className="poster-card-art">
+                        {coverUrl ? (
+                          <img src={coverUrl} alt={g.title} loading="lazy" />
+                        ) : (
+                          <div className="poster-card-fallback">
+                            <span
+                              className="poster-fallback-plat"
+                              style={{ color: platform.accent, borderColor: platform.accent }}
+                            >
+                              {platform.shortName}
+                            </span>
+                            <strong className="poster-fallback-title">{g.title}</strong>
+                          </div>
+                        )}
+                        <div className="poster-card-gloss" />
+                        {g.favorite && <span className="poster-fav-badge">★</span>}
+                      </div>
+                      <div className="poster-card-footer">
+                        <span className="poster-card-name">{g.title}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Bottom Preview Card directly underneath the grid */}
+            {focusedGame && (
+              <div className="grid-bottom-preview-card">
+                <div className="grid-preview-main">
+                  <strong className="spotlight-panel-title grid-preview-title">
+                    {focusedGame.title}
+                  </strong>
+                  <span
+                    className="grid-preview-plat"
+                    style={{ borderColor: platform.accent, color: platform.accent }}
+                  >
+                    [{focusedGame.source === "steam" ? "Steam" : platform.shortName}]
+                  </span>
+                  <span className="grid-preview-pipe">|</span>
+                  <span className="grid-preview-meta">
+                    {focusedGame.metadata?.releaseDate || platform.year}
+                  </span>
+                  <span className="grid-preview-pipe">|</span>
+                  <span className="grid-preview-meta">
+                    {focusedGame.metadata?.genre || platform.media.toUpperCase()}
+                  </span>
+                  <span className="grid-preview-pipe">|</span>
+                  <span className="grid-preview-meta tabular-nums">
+                    Playtime: {formatPlaytime(focusedGame.playtime)}
+                  </span>
+                  <span className="grid-preview-pipe">|</span>
+                  <span className="grid-preview-meta tabular-nums">
+                    File: {formatBytes(focusedGame.fileSize)}
+                  </span>
+                </div>
+
+                <div className="grid-preview-actions">
+                  <button
+                    className="btn-play-emerald btn-sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      launchGame(focusedGame.id);
+                    }}
+                  >
+                    <span className="xbox-btn btn-a">A</span>
+                    <span>Play</span>
+                  </button>
+                  <button
+                    className="btn-details-showcase btn-sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDrawerOpen(true);
+                    }}
+                  >
+                    <span className="xbox-btn btn-x">X</span>
+                    <span>Quick Sheet</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ═══════════════════════════════════════════════════════════════════════
+             SCREEN 4: QUICK-DETAILS SLIDE-OVER DRAWER (width: 38%, 450ms cubic-bezier)
+             ═══════════════════════════════════════════════════════════════════════ */}
+          <aside className={`quick-details-drawer ${drawerOpen ? "is-open" : ""}`}>
+            {focusedGame && (
+              <div className="qd-drawer-inner">
+                <div className="qd-drawer-header">
+                  <span className="qd-drawer-eyebrow">Quick Details</span>
+                  <button
+                    className="qd-close-btn"
+                    onClick={() => setDrawerOpen(false)}
+                    title="Close Panel (B)"
+                  >
+                    <span className="xbox-btn btn-b">B</span>
+                    <span>✕</span>
+                  </button>
+                </div>
+
+                {/* 1. Title & Console Pill */}
+                <div className="qd-title-block">
+                  <h1 className="qd-game-title">{focusedGame.title}</h1>
+                  <div className="qd-pill-row">
+                    <span
+                      className="qd-console-pill"
+                      style={{ background: platform.accent }}
+                    >
+                      [{platform.name}]
+                    </span>
+                    {focusedGame.region && (
+                      <span className="badge-glass">{focusedGame.region}</span>
+                    )}
+                    {focusedGame.favorite && (
+                      <span className="badge-gold">★ Favorite</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. Action Row & 3D Box Art */}
+                <div className="qd-hero-action-row">
+                  <div className="qd-3d-box-preview">
+                    <CollectibleCard
+                      game={focusedGame}
+                      platform={platform}
+                      focused
+                      size="compact"
+                    />
+                  </div>
+                  <div className="qd-cta-stack">
+                    <button
+                      className="qd-btn-play-now"
+                      onClick={() => launchGame(focusedGame.id)}
+                    >
+                      <span>PLAY NOW</span>
+                      <span className="xbox-btn btn-a">A</span>
+                    </button>
+                    <button
+                      className="qd-btn-full-page"
+                      onClick={() => {
+                        setDrawerOpen(false);
+                        navigate({ kind: "game", gameId: focusedGame.id });
+                      }}
+                    >
+                      <span>FULL DETAILS</span>
+                      <span className="xbox-btn btn-x">X</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3. Compact 2-Column Spec Table */}
+                <div className="qd-spec-grid">
+                  <div className="qd-spec-cell">
+                    <span>Developer</span>
+                    <strong>{focusedGame.metadata?.developer || platform.manufacturer}</strong>
+                  </div>
+                  <div className="qd-spec-cell">
+                    <span>Publisher</span>
+                    <strong>{focusedGame.metadata?.publisher || platform.manufacturer}</strong>
+                  </div>
+                  <div className="qd-spec-cell">
+                    <span>Year</span>
+                    <strong>{focusedGame.metadata?.releaseDate || platform.year}</strong>
+                  </div>
+                  <div className="qd-spec-cell">
+                    <span>Genre</span>
+                    <strong>{focusedGame.metadata?.genre || platform.media.toUpperCase()}</strong>
+                  </div>
+                </div>
+
+                {/* 4. Description Block (4-line synopsis with smooth gradient fade-out) */}
+                <div className="qd-description-block">
+                  <span className="qd-section-label">Description</span>
+                  <div className="qd-description-scroll" ref={drawerDescRef}>
+                    <p>
+                      {focusedGame.metadata?.description ||
+                        `Experience ${focusedGame.title} on ${platform.name} (${platform.year}). Configured with isolated per-game emulator settings, controller profile mapping, and real-time session tracking.`}
+                    </p>
+                  </div>
+                </div>
+
+                {/* 5. Quick Stats */}
+                <div className="qd-quick-stats-footer">
+                  <div>
+                    <span>Playtime</span>
+                    <strong className="tabular-nums">
+                      {formatPlaytime(focusedGame.playtime)}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Last Played</span>
+                    <strong>{formatRelativeDate(focusedGame.lastPlayed)}</strong>
+                  </div>
+                  <div>
+                    <span>Size</span>
+                    <strong className="tabular-nums">
+                      {formatBytes(focusedGame.fileSize)}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+            )}
+          </aside>
+        </div>
       )}
 
-      {/* Bottom Controller Legend Bar */}
-      <BottomPromptBar
-        items={[
-          {
-            btn: "X",
-            label: "Play Game",
-            onClick: focusedGame ? () => launchGame(focusedGame.id) : undefined,
-          },
-          {
-            btn: "A",
-            label: "Game Page & Settings",
-            onClick: focusedGame
-              ? () => navigate({ kind: "game", gameId: focusedGame.id })
-              : undefined,
-          },
-          {
-            btn: "Y",
-            label: "Search by Name",
-            onClick: openSearch,
-          },
-          {
-            btn: "SELECT",
-            label: focusedGame?.favorite ? "Unfavorite" : "Favorite",
-            onClick: focusedGame ? () => toggleFavorite(focusedGame) : undefined,
-          },
-          { btn: "LB", label: "Prev Console", onClick: () => cyclePlatform(-1) },
-          { btn: "RB", label: "Next Console", onClick: () => cyclePlatform(1) },
-          {
-            btn: "RT",
-            label: `Sort: ${SORTS[sortIdx].label}`,
-            onClick: () => setSortIdx((i) => (i + 1) % SORTS.length),
-          },
-          { btn: "B", label: "Back to Consoles", onClick: back },
-        ]}
-      />
+      {/* Bottom Controller Legend Bar dynamically adapted to Screen 2, 3, or 4 */}
+      {drawerOpen ? (
+        <BottomPromptBar
+          items={[
+            {
+              btn: "A",
+              label: "Play Game",
+              onClick: focusedGame ? () => launchGame(focusedGame.id) : undefined,
+            },
+            {
+              btn: "X",
+              label: "Fullscreen Page",
+              onClick: focusedGame
+                ? () => {
+                    setDrawerOpen(false);
+                    navigate({ kind: "game", gameId: focusedGame.id });
+                  }
+                : undefined,
+            },
+            {
+              btn: "B",
+              label: "Close Panel",
+              onClick: () => setDrawerOpen(false),
+            },
+            {
+              btn: "UP/DOWN",
+              label: "Scroll Details",
+            },
+          ]}
+        />
+      ) : platformViewMode === "grid" ? (
+        <BottomPromptBar
+          items={[
+            {
+              btn: "A",
+              label: "Play Game",
+              onClick: focusedGame ? () => launchGame(focusedGame.id) : undefined,
+            },
+            {
+              btn: "X",
+              label: "Quick Sheet",
+              onClick: focusedGame ? () => setDrawerOpen(true) : undefined,
+            },
+            {
+              btn: "VIEW",
+              label: "Coverflow",
+              onClick: () => togglePlatformViewMode(),
+            },
+            {
+              btn: "D-PAD",
+              label: "Browse",
+            },
+            {
+              btn: "LT/RT",
+              label: "Page Jump",
+            },
+            {
+              btn: "B",
+              label: "Consoles",
+              onClick: back,
+            },
+          ]}
+        />
+      ) : (
+        <BottomPromptBar
+          items={[
+            {
+              btn: "A",
+              label: "Play Game",
+              onClick: focusedGame ? () => launchGame(focusedGame.id) : undefined,
+            },
+            {
+              btn: "X",
+              label: "Game Details",
+              onClick: focusedGame
+                ? () => navigate({ kind: "game", gameId: focusedGame.id })
+                : undefined,
+            },
+            {
+              btn: "VIEW",
+              label: "Toggle Grid",
+              onClick: () => togglePlatformViewMode(),
+            },
+            {
+              btn: "LB/RB",
+              label: "Letter Jump",
+              onClick: () => jumpGames(1),
+            },
+            {
+              btn: "Y",
+              label: "Filter",
+              onClick: openSearch,
+            },
+            {
+              btn: "B",
+              label: "Back",
+              onClick: back,
+            },
+          ]}
+        />
+      )}
     </div>
   );
 };

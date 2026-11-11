@@ -45,6 +45,8 @@ interface Store {
   history: Screen[];
   homeIndex: number;
   platformFocus: Record<string, number>;
+  platformViewMode: "coverflow" | "grid";
+  totalPlaytimeSeconds: number;
 
   platforms: PlatformSummary[];
   platformDefs: Platform[];
@@ -69,6 +71,8 @@ interface Store {
   goHome: () => void;
   setHomeIndex: (idx: number) => void;
   setPlatformFocus: (platformId: string, idx: number) => void;
+  setPlatformViewMode: (mode: "coverflow" | "grid") => void;
+  togglePlatformViewMode: () => void;
 
   triggerScan: () => Promise<ScanReport | null>;
   launchGame: (gameId: number) => Promise<void>;
@@ -92,6 +96,8 @@ export const useStore = create<Store>((set, get) => ({
   history: [],
   homeIndex: 0,
   platformFocus: {},
+  platformViewMode: "coverflow",
+  totalPlaytimeSeconds: 0,
 
   platforms: [],
   platformDefs: [],
@@ -136,12 +142,14 @@ export const useStore = create<Store>((set, get) => ({
 
   refreshOverview: async () => {
     const showEmpty = get().appSettings.showEmptyPlatforms;
-    const [platforms, recent, emulators] = await Promise.all([
+    const [platforms, recent, emulators, allGames] = await Promise.all([
       api.getPlatforms(showEmpty),
       api.getRecent(16),
       api.getEmulators(),
+      api.getGames(null).catch(() => [] as Game[]),
     ]);
-    set({ platforms, recent, emulators });
+    const totalPlaytimeSeconds = allGames.reduce((acc, g) => acc + (g.playtime || 0), 0);
+    set({ platforms, recent, emulators, totalPlaytimeSeconds });
   },
 
   navigate: (next) => {
@@ -170,6 +178,11 @@ export const useStore = create<Store>((set, get) => ({
   setHomeIndex: (idx) => set({ homeIndex: idx }),
   setPlatformFocus: (platformId, idx) =>
     set((s) => ({ platformFocus: { ...s.platformFocus, [platformId]: idx } })),
+  setPlatformViewMode: (mode) => set({ platformViewMode: mode }),
+  togglePlatformViewMode: () =>
+    set((s) => ({
+      platformViewMode: s.platformViewMode === "coverflow" ? "grid" : "coverflow",
+    })),
 
   triggerScan: async () => {
     if (get().scanning) return null;

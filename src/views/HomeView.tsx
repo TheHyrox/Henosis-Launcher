@@ -1,13 +1,14 @@
-// Step 1 of the Console-First Flow: 3D Console Showcase Carousel with Dynamic Environment
+// Screen 1: Consoles Hub (Platform Selection Carousel)
 //
-// Directive implementations:
-// - Dynamic Console-Themed Environment (Wii U cyan wavy ribbons, Switch scarlet glowing waves,
-//   PlayStation navy/indigo atmosphere, Xbox 360 radiant emerald curves).
-// - Interactive 3D Showcase Carousel: highlighted console elevated and centered facing forward,
-//   adjacent systems angled inward with realistic perspective, depth of field blur, and smooth transitions.
+// Implements UI/UX Design System Specification:
+// - 3D Perspective Carousel (perspective: 1200px) with elliptical curve & 15% isotropic focus scale (scale(1.15))
+// - High-precision Vector Console Silhouettes (3DS dual-screen hinge, Switch detached rails, Steam/PC monitor chassis)
+// - Hardware Meta Badge (manufacturer branding, hardware release year, installed ROM count)
+// - Center HUD header (< SELECT CONSOLE (X/Y) >, Console Title, Game Count, [PRESS (A) TO OPEN])
+// - Controller Mapping: D-Pad Left/Right cycle, LB/RB Maker Filter jump, A Open Console, X Rescan, Y Global Search
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { formatRelativeDate, PlatformSummary } from "../api";
+import { api, formatRelativeDate, PlatformSummary } from "../api";
 import { ConsoleHardwareSvg } from "../components/Collectible";
 import { ConsoleEnvironment } from "../components/ConsoleEnvironment";
 import { BottomPromptBar } from "../components/TopBar";
@@ -26,6 +27,8 @@ export const HomeView: React.FC = () => {
     appSettings,
     updateAppSettings,
     setQuickMenu,
+    openKeyboard,
+    pushToast,
   } = useStore();
 
   const [makerIdx, setMakerIdx] = useState(0);
@@ -55,6 +58,40 @@ export const HomeView: React.FC = () => {
     }
   }, [clampedHome, filteredPlatforms.length]);
 
+  const openGlobalSearch = () => {
+    openKeyboard({
+      title: "Global Library & Console Search",
+      initial: "",
+      placeholder: "Search games or consoles…",
+      onSubmit: async (q) => {
+        const query = q.trim().toLowerCase();
+        if (!query) return;
+        const platIdx = filteredPlatforms.findIndex(
+          (p) =>
+            p.name.toLowerCase().includes(query) ||
+            p.shortName.toLowerCase().includes(query)
+        );
+        if (platIdx !== -1) {
+          setHomeIndex(platIdx);
+          return;
+        }
+        try {
+          const allGames = await api.getGames(null);
+          const match = allGames.find(
+            (g) => !g.hidden && !g.missing && g.title.toLowerCase().includes(query)
+          );
+          if (match) {
+            navigate({ kind: "game", gameId: match.id });
+            return;
+          }
+          pushToast(`No console or game matching "${q}"`, "info");
+        } catch (err) {
+          pushToast(String(err), "error");
+        }
+      },
+    });
+  };
+
   usePad((btn) => {
     if (btn === "lb") {
       setMakerIdx((i) => (i - 1 + MAKERS.length) % MAKERS.length);
@@ -83,10 +120,7 @@ export const HomeView: React.FC = () => {
       return true;
     }
     if (btn === "y") {
-      updateAppSettings({
-        ...appSettings,
-        showEmptyPlatforms: !appSettings.showEmptyPlatforms,
-      });
+      openGlobalSearch();
       return true;
     }
     if (btn === "start") {
@@ -94,14 +128,17 @@ export const HomeView: React.FC = () => {
       return true;
     }
     if (btn === "select") {
-      navigate({ kind: "settings" });
+      updateAppSettings({
+        ...appSettings,
+        showEmptyPlatforms: !appSettings.showEmptyPlatforms,
+      });
       return true;
     }
     return false;
   }, 0);
 
-  const bgAccent = activePlatform?.accent || "#7c5cff";
-  const bgColor = activePlatform?.color || "#121628";
+  const bgAccent = activePlatform?.accent || "#FF3D55";
+  const bgColor = activePlatform?.color || "#101622";
 
   return (
     <div
@@ -118,7 +155,7 @@ export const HomeView: React.FC = () => {
 
       <div className="showcase-grid-floor" />
 
-      {/* Top manufacturer filter strip */}
+      {/* Manufacturer filter strip */}
       <div className="home-filter-bar">
         <span className="pill-hint">LB</span>
         <div className="maker-tabs">
@@ -147,20 +184,28 @@ export const HomeView: React.FC = () => {
             })
           }
         >
-          {appSettings.showEmptyPlatforms ? "All 42 Systems Shown (Y)" : "Installed Systems Only (Y)"}
+          {appSettings.showEmptyPlatforms ? "All 42 Systems (View)" : "Installed Only (View)"}
         </button>
       </div>
 
       {activePlatform ? (
-        /* Grand Central Hero Carousel Stage (Maximum Height replacing static hero stage) */
         <section className="console-hero-carousel-stage">
+          {/* Spec Center HUD Header: < SELECT CONSOLE (3/8) > / Console Title / X Games / [PRESS (A) TO OPEN] */}
           <div className="carousel-hero-header">
             <span className="carousel-hero-counter">
-              ◀ SELECT CONSOLE ({clampedHome + 1} / {filteredPlatforms.length}) ▶
+              &lt; SELECT CONSOLE ({clampedHome + 1}/{filteredPlatforms.length}) &gt;
             </span>
-            <span className="carousel-hero-sub">
-              D-Pad Left / Right to rotate · Press <b>A</b> to enter {activePlatform.shortName} Library
+            <h1 className="carousel-hero-active-title">{activePlatform.name}</h1>
+            <span className="carousel-hero-game-count">
+              {activePlatform.gameCount} {activePlatform.gameCount === 1 ? "Game" : "Games"} ·{" "}
+              {activePlatform.year}
             </span>
+            <button
+              className="carousel-press-open-pill"
+              onClick={() => navigate({ kind: "platform", platformId: activePlatform.id })}
+            >
+              [PRESS (A) TO OPEN]
+            </button>
           </div>
 
           <div className="console-carousel-track" ref={trackRef}>
@@ -168,7 +213,7 @@ export const HomeView: React.FC = () => {
               const offset = idx - clampedHome;
               const focused = idx === clampedHome;
               const absOffset = Math.abs(offset);
-              const opacity = focused ? 1 : Math.max(0.55, 1 - absOffset * 0.12);
+              const opacity = focused ? 1 : Math.max(0.55, 1 - absOffset * 0.14);
 
               return (
                 <div
@@ -223,7 +268,7 @@ export const HomeView: React.FC = () => {
                       <span className="hero-card-last-played">
                         {plat.lastPlayed
                           ? `Last played ${formatRelativeDate(plat.lastPlayed)}`
-                          : "Not played yet"}
+                          : "Ready to launch"}
                       </span>
                     </div>
 
@@ -236,7 +281,7 @@ export const HomeView: React.FC = () => {
                           navigate({ kind: "platform", platformId: plat.id });
                         }}
                       >
-                        <span>Browse {plat.shortName} Library</span>
+                        <span>Open {plat.shortName} Library</span>
                         <span className="xbox-btn btn-a">A</span>
                       </button>
                     )}
@@ -250,15 +295,15 @@ export const HomeView: React.FC = () => {
         <section className="console-empty-state">
           <h2>No Consoles Found in This Category</h2>
           <p>
-            Press <b>Y</b> to browse all 42 supported gaming systems, or open{" "}
-            <b>Settings → Library & ROM Folders</b> to add your games directory.
+            Press <b>View (Select)</b> to browse all 42 supported gaming systems, or open{" "}
+            <b>Settings → Library &amp; ROM Folders</b> to add your games directory.
           </p>
           <div className="empty-actions">
             <button
               className="btn-primary"
               onClick={() => updateAppSettings({ ...appSettings, showEmptyPlatforms: true })}
             >
-              Show All 42 Consoles (Y)
+              Show All 42 Consoles
             </button>
             <button
               className="btn-ghost"
@@ -274,29 +319,39 @@ export const HomeView: React.FC = () => {
         items={[
           {
             btn: "A",
-            label: "Open Console Games",
+            label: "Open Console",
             onClick: activePlatform
               ? () => navigate({ kind: "platform", platformId: activePlatform.id })
               : undefined,
           },
-          { btn: "X", label: "Rescan Library", onClick: () => triggerScan() },
+          { btn: "X", label: "Rescan", onClick: () => triggerScan() },
+          {
+            btn: "LB/RB",
+            label: "Maker Filter",
+            onClick: () => {
+              setMakerIdx((i) => (i + 1) % MAKERS.length);
+              setHomeIndex(0);
+            },
+          },
           {
             btn: "Y",
-            label: appSettings.showEmptyPlatforms ? "Installed Only" : "Show All 42 Consoles",
+            label: "Search",
+            onClick: openGlobalSearch,
+          },
+          {
+            btn: "VIEW",
+            label: appSettings.showEmptyPlatforms ? "Installed Only" : "All 42 Systems",
             onClick: () =>
               updateAppSettings({
                 ...appSettings,
                 showEmptyPlatforms: !appSettings.showEmptyPlatforms,
               }),
           },
-          { btn: "LB", label: "Prev Maker" },
-          { btn: "RB", label: "Next Maker" },
           {
-            btn: "SELECT",
-            label: "Settings",
-            onClick: () => navigate({ kind: "settings" }),
+            btn: "B",
+            label: "Back",
+            onClick: () => setMakerIdx(0),
           },
-          { btn: "START", label: "Quick Menu", onClick: () => setQuickMenu(true) },
         ]}
       />
     </div>

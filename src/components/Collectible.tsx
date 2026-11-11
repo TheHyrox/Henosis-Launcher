@@ -25,27 +25,117 @@ export const ConsoleHardwareSvg: React.FC<{ platform: Platform; className?: stri
   const accent = platform.accent;
   const id = platform.id;
 
-  // Steam / PC
+  // Steam / PC (Monitor chassis & gaming rig silhouette)
   if (id === "steam" || id === "pc") {
     return (
       <svg viewBox="0 0 240 140" className={className} fill="none">
-        <rect x="28" y="18" width="184" height="86" rx="10" fill="#101522" stroke={accent} strokeWidth="2.5" />
-        <rect x="38" y="28" width="164" height="66" rx="5" fill="#090d16" />
-        <circle cx="120" cy="61" r="18" stroke={accent} strokeWidth="3" opacity="0.85" />
-        <circle cx="120" cy="61" r="7" fill={accent} />
-        <path d="M90 116 H150 L162 124 H78 Z" fill="#1b2336" stroke={accent} strokeWidth="1.5" />
+        {/* Ultrawide Monitor Chassis */}
+        <rect x="24" y="14" width="192" height="90" rx="10" fill="#0B0E14" stroke={accent} strokeWidth="2.5" />
+        <rect x="32" y="22" width="176" height="72" rx="5" fill="#101622" stroke={accent} strokeWidth="1" opacity="0.6" />
+        {/* Isometric Grid / Telemetry Lines on Screen */}
+        <line x1="32" y1="78" x2="208" y2="78" stroke={accent} strokeWidth="0.8" opacity="0.25" />
+        {/* Steam Piston / Rotor Vector */}
+        <circle cx="132" cy="54" r="18" stroke={accent} strokeWidth="2.5" opacity="0.9" />
+        <circle cx="132" cy="54" r="7" fill={accent} />
+        <circle cx="102" cy="68" r="9" stroke={accent} strokeWidth="2.2" fill="#0B0E14" />
+        <path d="M107 62 L127 49 M110 72 L134 60" stroke={accent} strokeWidth="3" strokeLinecap="round" />
+        {/* Monitor Neck & Base Stand */}
+        <path d="M108 104 H132 L138 118 H102 Z" fill="#101622" stroke={accent} strokeWidth="1.8" />
+        <path d="M78 118 H162 L170 125 H70 Z" fill="#161E2E" stroke={accent} strokeWidth="2" />
       </svg>
     );
   }
 
-  // Handhelds (Game Boy / GBA / DS / 3DS / Switch / Vita / PSP / Game Gear / Lynx / WonderSwan / NGP)
-  if (["gb", "gbc", "gba", "nds", "n3ds", "switch", "switch2", "psvita", "psp", "gamegear", "lynx", "wonderswan", "ngp", "pokemini"].includes(id)) {
+  // Nintendo DS / 3DS (Dual screens with center hinge detailing, cameras & stylus slot)
+  if (id === "nds" || id === "n3ds") {
+    const is3ds = id === "n3ds";
+    return (
+      <svg viewBox="0 0 240 140" className={className} fill="none">
+        {/* Top Clamshell Lid */}
+        <rect x="44" y="6" width="152" height="60" rx="10" fill="#0B0E14" stroke={accent} strokeWidth="2.3" />
+        {/* Top Widescreen / 4:3 Display */}
+        <rect x={is3ds ? "62" : "70"} y="13" width={is3ds ? "116" : "100"} height="46" rx="4" fill="#101622" stroke={accent} strokeWidth="1.5" />
+        {/* Stereo Speaker Perforations */}
+        <circle cx="53" cy="36" r="1.6" fill={accent} opacity="0.7" />
+        <circle cx="57" cy="36" r="1.6" fill={accent} opacity="0.7" />
+        <circle cx="183" cy="36" r="1.6" fill={accent} opacity="0.7" />
+        <circle cx="187" cy="36" r="1.6" fill={accent} opacity="0.7" />
+        {/* Center Cylindrical Hinge with LED Indicators */}
+        <rect x="40" y="65" width="160" height="9" rx="4.5" fill="#161E2E" stroke={accent} strokeWidth="2" />
+        <line x1="72" y1="65" x2="72" y2="74" stroke={accent} strokeWidth="1.5" opacity="0.6" />
+        <line x1="168" y1="65" x2="168" y2="74" stroke={accent} strokeWidth="1.5" opacity="0.6" />
+        <circle cx="184" cy="69.5" r="2" fill="#00E676" />
+        {/* Bottom Clamshell Body */}
+        <rect x="44" y="73" width="152" height="61" rx="10" fill="#0B0E14" stroke={accent} strokeWidth="2.3" />
+        {/* Bottom Touch Screen */}
+        <rect x="76" y="80" width="88" height="46" rx="3" fill="#101622" stroke={accent} strokeWidth="1.5" />
+        {/* Circle Pad (3DS) & D-Pad */}
+        {is3ds ? (
+          <>
+            <circle cx="59" cy="92" r="7.5" fill="#161E2E" stroke={accent} strokeWidth="2" />
+            <path d="M55 113 H63 M59 109 V117" stroke={accent} strokeWidth="2.2" strokeLinecap="round" />
+          </>
+        ) : (
+          <path d="M53 102 H65 M59 96 V108" stroke={accent} strokeWidth="2.8" strokeLinecap="round" />
+        )}
+        {/* ABXY Action Buttons */}
+        <circle cx="181" cy="94" r="2.6" fill={accent} />
+        <circle cx="181" cy="106" r="2.6" fill={accent} />
+        <circle cx="175" cy="100" r="2.6" fill={accent} opacity="0.8" />
+        <circle cx="187" cy="100" r="2.6" fill={accent} opacity="0.8" />
+      </svg>
+    );
+  }
+
+  // Nintendo Switch / Switch 2 (Tablet chassis with detached / rail-mounted Joy-Cons)
+  if (id === "switch" || id === "switch2") {
+    return (
+      <svg viewBox="0 0 240 140" className={className} fill="none">
+        {/* Left Joy-Con (slightly detached to show precision rail silhouette) */}
+        <path
+          d="M42 22 H56 V114 H42 C29 114 22 105 22 92 V44 C22 31 29 22 42 22 Z"
+          fill="#0B0E14"
+          stroke="#00D2FF"
+          strokeWidth="2.4"
+        />
+        <rect x="56" y="30" width="3" height="76" fill="#00D2FF" opacity="0.5" />
+        <circle cx="39" cy="48" r="7" stroke="#00D2FF" strokeWidth="2.2" />
+        <circle cx="39" cy="78" r="2.5" fill="#00D2FF" />
+        <circle cx="39" cy="90" r="2.5" fill="#00D2FF" />
+        <circle cx="33" cy="84" r="2.5" fill="#00D2FF" />
+        <circle cx="45" cy="84" r="2.5" fill="#00D2FF" />
+
+        {/* Center Tablet Console Chassis */}
+        <rect x="64" y="24" width="112" height="90" rx="7" fill="#0B0E14" stroke={accent} strokeWidth="2.5" />
+        <rect x="72" y="31" width="96" height="76" rx="4" fill="#101622" stroke={accent} strokeWidth="1.3" opacity="0.9" />
+        {/* Subtle Screen Glare Line */}
+        <path d="M82 98 L142 38" stroke={accent} strokeWidth="1.2" opacity="0.25" />
+
+        {/* Right Joy-Con (Neon Red / Coral) */}
+        <rect x="181" y="30" width="3" height="76" fill="#FF3D55" opacity="0.5" />
+        <path
+          d="M184 22 H198 C211 22 218 31 218 44 V92 C218 105 211 114 198 114 H184 V22 Z"
+          fill="#0B0E14"
+          stroke="#FF3D55"
+          strokeWidth="2.4"
+        />
+        <circle cx="201" cy="44" r="2.5" fill="#FF3D55" />
+        <circle cx="201" cy="56" r="2.5" fill="#FF3D55" />
+        <circle cx="195" cy="50" r="2.5" fill="#FF3D55" />
+        <circle cx="207" cy="50" r="2.5" fill="#FF3D55" />
+        <circle cx="201" cy="80" r="7" stroke="#FF3D55" strokeWidth="2.2" />
+      </svg>
+    );
+  }
+
+  // Other Handhelds (Game Boy / GBA / Vita / PSP / Game Gear / Lynx / WonderSwan / NGP)
+  if (["gb", "gbc", "gba", "psvita", "psp", "gamegear", "lynx", "wonderswan", "ngp", "pokemini"].includes(id)) {
     const vertical = ["gb", "gbc", "pokemini"].includes(id);
     if (vertical) {
       return (
         <svg viewBox="0 0 240 140" className={className} fill="none">
-          <rect x="74" y="8" width="92" height="124" rx="12" fill="#171b26" stroke={accent} strokeWidth="2.5" />
-          <rect x="86" y="18" width="68" height="50" rx="5" fill="#0b0f18" stroke={accent} strokeWidth="1.5" opacity="0.9" />
+          <rect x="74" y="8" width="92" height="124" rx="12" fill="#0B0E14" stroke={accent} strokeWidth="2.5" />
+          <rect x="86" y="18" width="68" height="50" rx="5" fill="#101622" stroke={accent} strokeWidth="1.5" opacity="0.9" />
           <path d="M96 88 H108 M102 82 V94" stroke={accent} strokeWidth="3.5" strokeLinecap="round" />
           <circle cx="138" cy="85" r="5" fill={accent} />
           <circle cx="126" cy="93" r="5" fill={accent} opacity="0.75" />
@@ -54,8 +144,8 @@ export const ConsoleHardwareSvg: React.FC<{ platform: Platform; className?: stri
     }
     return (
       <svg viewBox="0 0 240 140" className={className} fill="none">
-        <rect x="20" y="26" width="200" height="88" rx="28" fill="#151925" stroke={accent} strokeWidth="2.5" />
-        <rect x="58" y="36" width="124" height="68" rx="6" fill="#090c14" stroke={accent} strokeWidth="1.4" opacity="0.85" />
+        <rect x="20" y="26" width="200" height="88" rx="28" fill="#0B0E14" stroke={accent} strokeWidth="2.5" />
+        <rect x="58" y="36" width="124" height="68" rx="6" fill="#101622" stroke={accent} strokeWidth="1.4" opacity="0.85" />
         <circle cx="39" cy="56" r="7" stroke={accent} strokeWidth="2.2" />
         <path d="M35 78 H43 M39 74 V82" stroke={accent} strokeWidth="2.4" strokeLinecap="round" />
         <circle cx="201" cy="54" r="4" fill={accent} />
@@ -69,10 +159,10 @@ export const ConsoleHardwareSvg: React.FC<{ platform: Platform; className?: stri
   if (platform.media === "disc") {
     return (
       <svg viewBox="0 0 240 140" className={className} fill="none">
-        <rect x="26" y="42" width="188" height="64" rx="12" fill="#131722" stroke={accent} strokeWidth="2.5" />
-        <rect x="38" y="70" width="164" height="5" rx="2.5" fill="#080a10" />
-        <circle cx="120" cy="40" r="24" fill="#1a2030" stroke={accent} strokeWidth="2" opacity="0.9" />
-        <circle cx="120" cy="40" r="6" fill="#090c14" stroke={accent} strokeWidth="1.5" />
+        <rect x="26" y="42" width="188" height="64" rx="12" fill="#0B0E14" stroke={accent} strokeWidth="2.5" />
+        <rect x="38" y="70" width="164" height="5" rx="2.5" fill="#101622" stroke={accent} strokeWidth="1" />
+        <circle cx="120" cy="40" r="24" fill="#101622" stroke={accent} strokeWidth="2" opacity="0.9" />
+        <circle cx="120" cy="40" r="6" fill="#0B0E14" stroke={accent} strokeWidth="1.5" />
         <circle cx="186" cy="56" r="4" fill={accent} />
         <rect x="46" y="86" width="44" height="8" rx="4" fill={accent} opacity="0.35" />
       </svg>
@@ -82,11 +172,11 @@ export const ConsoleHardwareSvg: React.FC<{ platform: Platform; className?: stri
   // Classic cartridge deck (NES / SNES / N64 / Mega Drive / Atari / etc.)
   return (
     <svg viewBox="0 0 240 140" className={className} fill="none">
-      <rect x="28" y="48" width="184" height="62" rx="10" fill="#151925" stroke={accent} strokeWidth="2.5" />
-      <rect x="68" y="34" width="104" height="24" rx="5" fill="#1d2334" stroke={accent} strokeWidth="2" />
+      <rect x="28" y="48" width="184" height="62" rx="10" fill="#0B0E14" stroke={accent} strokeWidth="2.5" />
+      <rect x="68" y="34" width="104" height="24" rx="5" fill="#101622" stroke={accent} strokeWidth="2" />
       <rect x="78" y="40" width="84" height="8" rx="2" fill={accent} opacity="0.55" />
-      <rect x="46" y="76" width="38" height="12" rx="3" fill="#0b0e17" stroke={accent} strokeWidth="1.4" />
-      <rect x="96" y="76" width="38" height="12" rx="3" fill="#0b0e17" stroke={accent} strokeWidth="1.4" />
+      <rect x="46" y="76" width="38" height="12" rx="3" fill="#101622" stroke={accent} strokeWidth="1.4" />
+      <rect x="96" y="76" width="38" height="12" rx="3" fill="#101622" stroke={accent} strokeWidth="1.4" />
       <circle cx="182" cy="82" r="6" fill={accent} />
     </svg>
   );
@@ -161,6 +251,8 @@ const CollectibleCardComponent: React.FC<CollectibleProps> = ({
   // Determine physical case aesthetic class
   const getCaseTypeClass = () => {
     if (pid === "switch" || pid === "switch2") return "case-type-switch";
+    if (pid === "nds") return "case-type-nds";
+    if (pid === "n3ds") return "case-type-3ds";
     if (pid === "wiiu") return "case-type-wiiu";
     if (pid === "wii") return "case-type-wii";
     if (pid === "xbox360") return "case-type-xbox360";
@@ -181,6 +273,8 @@ const CollectibleCardComponent: React.FC<CollectibleProps> = ({
   // Banner branding text & colors
   const getBannerText = () => {
     if (pid === "switch" || pid === "switch2") return "NINTENDO SWITCH";
+    if (pid === "nds") return "NINTENDO DS";
+    if (pid === "n3ds") return "NINTENDO 3DS";
     if (pid === "wiiu") return "Wii U";
     if (pid === "wii") return "Wii";
     if (pid === "xbox360") return "XBOX 360";

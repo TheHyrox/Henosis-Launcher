@@ -46,6 +46,7 @@ export const App: React.FC = () => {
       const focusedConsoleCard = document.querySelector(".console-hero-card.is-focused");
       return {
         screen: store.screen,
+        platformViewMode: store.platformViewMode,
         platformsCount: store.platforms.length,
         homeIndex: store.homeIndex,
         activePlatform: store.platforms[store.homeIndex]?.id || null,
