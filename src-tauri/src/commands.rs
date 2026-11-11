@@ -109,10 +109,58 @@ pub fn get_sessions(state: State<AppState>, id: i64) -> R<Vec<Session>> {
 }
 
 #[tauri::command]
-pub async fn fetch_game_metadata(app: AppHandle, id: i64) -> R<Game> {
+pub async fn fetch_game_metadata(
+    app: AppHandle,
+    id: i64,
+    force: Option<bool>,
+    query: Option<String>,
+) -> R<Game> {
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AppState>();
-        metadata::fetch_for_game(&state.db, id)
+        metadata::fetch_for_game_opts(&state.db, id, force.unwrap_or(false), query.as_deref())
+    })
+    .await
+    .map_err(e)?
+}
+
+#[tauri::command]
+pub async fn search_metadata_candidates(
+    app: AppHandle,
+    id: i64,
+    query: Option<String>,
+) -> R<Vec<MetadataCandidate>> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        metadata::search_candidates(&state.db, id, query)
+    })
+    .await
+    .map_err(e)?
+}
+
+#[tauri::command]
+pub async fn apply_metadata_candidate(
+    app: AppHandle,
+    id: i64,
+    candidate: MetadataCandidate,
+) -> R<Game> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        metadata::apply_candidate(&state.db, id, candidate)
+    })
+    .await
+    .map_err(e)?
+}
+
+#[tauri::command]
+pub fn update_game_metadata(state: State<AppState>, id: i64, patch: GameMetadataUpdate) -> R<Game> {
+    metadata::update_manual_metadata(&state.db, id, patch)
+}
+
+#[tauri::command]
+pub async fn reset_game_metadata(app: AppHandle, id: i64, rescrape: bool) -> R<Game> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        metadata::reset_metadata(&state.db, id, rescrape)
     })
     .await
     .map_err(e)?

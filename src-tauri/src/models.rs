@@ -151,3 +151,38 @@ pub struct Session {
     pub ended: i64,
     pub duration: i64,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MetadataCandidate {
+    pub source: String,
+    pub title: String,
+    pub release_date: Option<String>,
+    pub developer: Option<String>,
+    pub publisher: Option<String>,
+    pub genre: Option<String>,
+    pub description: Option<String>,
+    pub cover: Option<String>,
+    pub hero: Option<String>,
+    pub logo: Option<String>,
+    pub region: Option<String>,
+    pub serial: Option<String>,
+    pub steam_app_id: Option<u32>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GameMetadataUpdate {
+    pub title: Option<String>,
+    pub platform: Option<String>,
+    pub region: Option<String>,
+    pub serial: Option<String>,
+    pub cover: Option<String>,
+    pub hero: Option<String>,
+    pub logo: Option<String>,
+    pub developer: Option<String>,
+    pub publisher: Option<String>,
+    pub release_date: Option<String>,
+    pub genre: Option<String>,
+    pub description: Option<String>,
+}

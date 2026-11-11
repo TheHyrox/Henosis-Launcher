@@ -155,10 +155,16 @@ impl Db {
         match existing {
             Some(id) => {
                 self.conn.execute(
-                    "UPDATE games SET platform = ?2, steam_app_id = ?3, region = COALESCE(?4, region), \
-                     serial = COALESCE(?5, serial), cover = COALESCE(?6, cover), hero = COALESCE(?7, hero), \
-                     logo = COALESCE(?8, logo), file_size = ?9, missing = 0, \
-                     title = CASE WHEN json_extract(metadata, '$.titleLocked') = 1 THEN title ELSE ?10 END \
+                    "UPDATE games SET \
+                     platform = CASE WHEN json_extract(metadata, '$.metadataLocked') = 1 THEN platform ELSE ?2 END, \
+                     steam_app_id = COALESCE(steam_app_id, ?3), \
+                     region = CASE WHEN json_extract(metadata, '$.metadataLocked') = 1 THEN region ELSE COALESCE(?4, region) END, \
+                     serial = CASE WHEN json_extract(metadata, '$.metadataLocked') = 1 THEN serial ELSE COALESCE(?5, serial) END, \
+                     cover = CASE WHEN json_extract(metadata, '$.metadataLocked') = 1 THEN cover ELSE COALESCE(?6, cover) END, \
+                     hero = CASE WHEN json_extract(metadata, '$.metadataLocked') = 1 THEN hero ELSE COALESCE(?7, hero) END, \
+                     logo = CASE WHEN json_extract(metadata, '$.metadataLocked') = 1 THEN logo ELSE COALESCE(?8, logo) END, \
+                     file_size = ?9, missing = 0, \
+                     title = CASE WHEN json_extract(metadata, '$.titleLocked') = 1 OR json_extract(metadata, '$.metadataLocked') = 1 THEN title ELSE ?10 END \
                      WHERE id = ?1",
                     params![id, g.platform, g.steam_app_id, g.region, g.serial, g.cover, g.hero, g.logo, g.file_size, g.title],
                 )?;
@@ -259,6 +265,28 @@ impl Db {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
+    pub fn set_game_full_metadata(
+        &self,
+        id: i64,
+        title: &str,
+        platform: &str,
+        steam_app_id: Option<u32>,
+        region: Option<&str>,
+        serial: Option<&str>,
+        cover: Option<&str>,
+        hero: Option<&str>,
+        logo: Option<&str>,
+        metadata: &serde_json::Value,
+    ) -> Result<()> {
+        self.conn.execute(
+            "UPDATE games SET title = ?2, platform = ?3, steam_app_id = ?4, region = ?5, serial = ?6, \
+             cover = ?7, hero = ?8, logo = ?9, metadata = ?10 WHERE id = ?1",
+            params![id, title, platform, steam_app_id, region, serial, cover, hero, logo, metadata.to_string()],
+        )?;
+        Ok(())
+    }
+
     pub fn rename_game(&self, id: i64, title: &str) -> Result<()> {
         self.conn.execute(
             "UPDATE games SET title = ?2, metadata = json_set(metadata, '$.titleLocked', 1) WHERE id = ?1",
@@ -268,7 +296,10 @@ impl Db {
     }
 
     pub fn set_game_platform(&self, id: i64, platform: &str) -> Result<()> {
-        self.conn.execute("UPDATE games SET platform = ?2 WHERE id = ?1", params![id, platform])?;
+        self.conn.execute(
+            "UPDATE games SET platform = ?2, metadata = json_set(metadata, '$.metadataLocked', 1) WHERE id = ?1",
+            params![id, platform],
+        )?;
         Ok(())
     }
 

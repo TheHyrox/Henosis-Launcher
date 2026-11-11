@@ -20,9 +20,11 @@ import {
   formatPlaytime,
   formatRelativeDate,
   Game,
+  GameMetadataUpdate,
   GameSettings,
   LaunchPreview,
   mediaSrc,
+  MetadataCandidate,
   Platform,
   Session,
 } from "../api";
@@ -178,6 +180,12 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
   const [settingIdx, setSettingIdx] = useState(0);
   const [fetchingMeta, setFetchingMeta] = useState(false);
   const [hotkeyModalOpen, setHotkeyModalOpen] = useState(false);
+  const [metaModalOpen, setMetaModalOpen] = useState(false);
+  const [metaMode, setMetaMode] = useState<"search" | "manual">("search");
+  const [metaSearchQuery, setMetaSearchQuery] = useState("");
+  const [metaCandidates, setMetaCandidates] = useState<MetadataCandidate[]>([]);
+  const [searchingCandidates, setSearchingCandidates] = useState(false);
+  const [metaFocusIdx, setMetaFocusIdx] = useState(0);
 
   const tab = TABS[tabIdx].id;
 
@@ -566,6 +574,299 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
   // 5: Bento Card 2 (Hardware & Emulator Setup -> Open EMULATOR CONFIG tab)
   // 6: Bento Card 3 (Achievements -> Open ACHIEVEMENTS tab)
   // 7: Bento Card 4 (Sessions Journal -> Open LOGS tab)
+  const runCandidateSearch = async (queryText?: string) => {
+    if (!game) return;
+    const q = (queryText ?? metaSearchQuery).trim() || game.title;
+    setMetaSearchQuery(q);
+    setSearchingCandidates(true);
+    try {
+      const list = await api.searchMetadataCandidates(game.id, q);
+      setMetaCandidates(list);
+    } catch (e) {
+      pushToast(`Metadata search failed: ${String(e)}`, "error");
+    } finally {
+      setSearchingCandidates(false);
+    }
+  };
+
+  const openMetaModal = () => {
+    if (!game) return;
+    setMetaMode("search");
+    setMetaFocusIdx(0);
+    setMetaSearchQuery(game.title);
+    setMetaModalOpen(true);
+    runCandidateSearch(game.title);
+  };
+
+  const handleApplyCandidate = async (cand: MetadataCandidate) => {
+    if (!game) return;
+    setSearchingCandidates(true);
+    try {
+      const updated = await api.applyMetadataCandidate(game.id, cand);
+      setGame(updated);
+      await refreshOverview();
+      pushToast(`Linked metadata & artwork to "${updated.title}"`, "success");
+      setMetaModalOpen(false);
+    } catch (e) {
+      pushToast(`Could not apply match: ${String(e)}`, "error");
+    } finally {
+      setSearchingCandidates(false);
+    }
+  };
+
+  const handlePatchMetadata = async (patch: GameMetadataUpdate, msg = "Metadata updated") => {
+    if (!game) return;
+    try {
+      const updated = await api.updateGameMetadata(game.id, patch);
+      setGame(updated);
+      await refreshOverview();
+      pushToast(msg, "success");
+    } catch (e) {
+      pushToast(`Could not update metadata: ${String(e)}`, "error");
+    }
+  };
+
+  const handleResetMetadata = async (rescrape: boolean) => {
+    if (!game) return;
+    setSearchingCandidates(true);
+    try {
+      const updated = await api.resetGameMetadata(game.id, rescrape);
+      setGame(updated);
+      setMetaSearchQuery(updated.title);
+      await refreshOverview();
+      pushToast(
+        rescrape
+          ? "Metadata reset to clean filename & re-scraped"
+          : "Metadata & artwork reset to clean filename",
+        "info"
+      );
+      if (metaModalOpen && metaMode === "search") {
+        runCandidateSearch(updated.title);
+      }
+    } catch (e) {
+      pushToast(`Reset failed: ${String(e)}`, "error");
+    } finally {
+      setSearchingCandidates(false);
+    }
+  };
+
+  const manualMetaRows: SettingRowSpec[] = useMemo(() => {
+    if (!game) return [];
+    const m = game.metadata || {};
+    const allPlats = platformDefs.length > 0 ? platformDefs : platforms;
+    const regionChoices = ["", "USA", "Europe", "Japan", "World", "USA / Europe", "Asia"];
+
+    const cycleList = <T,>(list: T[], cur: T, dir: -1 | 1): T => {
+      const idx = list.indexOf(cur);
+      const next = (idx + dir + list.length) % list.length;
+      return list[next];
+    };
+
+    return [
+      {
+        id: "meta-title",
+        group: "Core Identity",
+        label: "Game Title",
+        hint: "Display title (locks title against automatic scan overwrites)",
+        valueLabel: game.title,
+        isOverridden: Boolean(m.titleLocked || m.metadataLocked),
+        onActivate: () =>
+          openKeyboard({
+            title: "Edit Game Title",
+            initial: game.title,
+            onSubmit: (v) => {
+              if (v.trim()) handlePatchMetadata({ title: v.trim() }, "Game title updated");
+            },
+          }),
+      },
+      {
+        id: "meta-platform",
+        group: "Core Identity",
+        label: "Console Platform",
+        hint: "Reassign if this ROM was detected under the wrong system",
+        valueLabel: platform?.name || game.platform,
+        isOverridden: false,
+        onStep: (dir) => {
+          const ids = allPlats.map((p) => p.id);
+          if (ids.length === 0) return;
+          const nextId = cycleList(ids, game.platform, dir);
+          handlePatchMetadata({ platform: nextId }, `Moved to ${nextId.toUpperCase()}`);
+        },
+        onActivate: () => {
+          const ids = allPlats.map((p) => p.id);
+          if (ids.length === 0) return;
+          const nextId = cycleList(ids, game.platform, 1);
+          handlePatchMetadata({ platform: nextId }, `Moved to ${nextId.toUpperCase()}`);
+        },
+      },
+      {
+        id: "meta-region",
+        group: "Core Identity",
+        label: "Region Tag",
+        hint: "USA, Europe, Japan, World (Press Y to clear)",
+        valueLabel: game.region || "Unspecified",
+        isOverridden: Boolean(game.region),
+        onStep: (dir) => {
+          const nextReg = cycleList(regionChoices, game.region || "", dir);
+          handlePatchMetadata({ region: nextReg });
+        },
+        onActivate: () =>
+          openKeyboard({
+            title: "Edit Region (e.g. USA, Europe, Japan, World)",
+            initial: game.region || "",
+            onSubmit: (v) => handlePatchMetadata({ region: v.trim() }),
+          }),
+        onClear: () => handlePatchMetadata({ region: "" }, "Region cleared"),
+      },
+      {
+        id: "meta-serial",
+        group: "Core Identity",
+        label: "Serial / Title ID",
+        hint: "Product code or 16-digit Title ID (Press Y to clear)",
+        valueLabel: game.serial || "None",
+        isOverridden: Boolean(game.serial),
+        onActivate: () =>
+          openKeyboard({
+            title: "Edit Serial / Title ID",
+            initial: game.serial || "",
+            onSubmit: (v) => handlePatchMetadata({ serial: v.trim() }),
+          }),
+        onClear: () => handlePatchMetadata({ serial: "" }, "Serial cleared"),
+      },
+      {
+        id: "meta-developer",
+        group: "Credits & Release Info",
+        label: "Developer",
+        hint: "Studio that developed the game",
+        valueLabel: m.developer || "Default / Unknown",
+        isOverridden: Boolean(m.developer),
+        onActivate: () =>
+          openKeyboard({
+            title: "Edit Developer",
+            initial: m.developer || "",
+            onSubmit: (v) => handlePatchMetadata({ developer: v.trim() }),
+          }),
+        onClear: () => handlePatchMetadata({ developer: "" }, "Developer cleared"),
+      },
+      {
+        id: "meta-publisher",
+        group: "Credits & Release Info",
+        label: "Publisher",
+        hint: "Company that published the game",
+        valueLabel: m.publisher || "Default / Unknown",
+        isOverridden: Boolean(m.publisher),
+        onActivate: () =>
+          openKeyboard({
+            title: "Edit Publisher",
+            initial: m.publisher || "",
+            onSubmit: (v) => handlePatchMetadata({ publisher: v.trim() }),
+          }),
+        onClear: () => handlePatchMetadata({ publisher: "" }, "Publisher cleared"),
+      },
+      {
+        id: "meta-year",
+        group: "Credits & Release Info",
+        label: "Release Year / Date",
+        hint: "Original release year or date",
+        valueLabel: m.releaseDate || String(platform?.year || ""),
+        isOverridden: Boolean(m.releaseDate),
+        onActivate: () =>
+          openKeyboard({
+            title: "Edit Release Year / Date",
+            initial: m.releaseDate || "",
+            onSubmit: (v) => handlePatchMetadata({ releaseDate: v.trim() }),
+          }),
+        onClear: () => handlePatchMetadata({ releaseDate: "" }, "Release date cleared"),
+      },
+      {
+        id: "meta-genre",
+        group: "Credits & Release Info",
+        label: "Genre",
+        hint: "Game genres (e.g. Action · RPG · Platformer)",
+        valueLabel: m.genre || "Default",
+        isOverridden: Boolean(m.genre),
+        onActivate: () =>
+          openKeyboard({
+            title: "Edit Genre",
+            initial: m.genre || "",
+            onSubmit: (v) => handlePatchMetadata({ genre: v.trim() }),
+          }),
+        onClear: () => handlePatchMetadata({ genre: "" }, "Genre cleared"),
+      },
+      {
+        id: "meta-description",
+        group: "Credits & Release Info",
+        label: "Synopsis / Description",
+        hint: "About this game text displayed on the Overview tab",
+        valueLabel: m.description
+          ? `${m.description.slice(0, 34)}${m.description.length > 34 ? "…" : ""}`
+          : "Default Synopsis",
+        isOverridden: Boolean(m.description),
+        onActivate: () =>
+          openKeyboard({
+            title: "Edit Game Synopsis / Description",
+            initial: m.description || "",
+            onSubmit: (v) => handlePatchMetadata({ description: v.trim() }),
+          }),
+        onClear: () => handlePatchMetadata({ description: "" }, "Synopsis cleared"),
+      },
+      {
+        id: "meta-cover",
+        group: "Artwork & Media Links",
+        label: "3D Box / Cover Art",
+        hint: "Press A to browse local image file · Press Y to clear wrong cover",
+        valueLabel: game.cover ? "Custom / Linked Art" : "None (Fallback Vector)",
+        isOverridden: Boolean(game.cover),
+        onActivate: () =>
+          openFileBrowser({
+            title: "Select Cover / Box Art Image (.png, .jpg, .webp)",
+            pickMode: "file",
+            onPick: (path) => handlePatchMetadata({ cover: path }, "Cover art updated"),
+          }),
+        onClear: () => handlePatchMetadata({ cover: "" }, "Cover art cleared"),
+      },
+      {
+        id: "meta-hero",
+        group: "Artwork & Media Links",
+        label: "Hero Backdrop / Screenshot",
+        hint: "Press A to browse local image file · Press Y to clear wrong backdrop",
+        valueLabel: game.hero ? "Custom / Linked Hero" : "None",
+        isOverridden: Boolean(game.hero),
+        onActivate: () =>
+          openFileBrowser({
+            title: "Select Hero / Backdrop Image (.png, .jpg, .webp)",
+            pickMode: "file",
+            onPick: (path) => handlePatchMetadata({ hero: path }, "Hero backdrop updated"),
+          }),
+        onClear: () => handlePatchMetadata({ hero: "" }, "Hero backdrop cleared"),
+      },
+      {
+        id: "meta-logo",
+        group: "Artwork & Media Links",
+        label: "Clear Logo / Marquee",
+        hint: "Press A to browse local image file · Press Y to clear",
+        valueLabel: game.logo ? "Custom / Linked Logo" : "None",
+        isOverridden: Boolean(game.logo),
+        onActivate: () =>
+          openFileBrowser({
+            title: "Select Logo / Marquee Image (.png, .jpg, .webp)",
+            pickMode: "file",
+            onPick: (path) => handlePatchMetadata({ logo: path }, "Logo updated"),
+          }),
+        onClear: () => handlePatchMetadata({ logo: "" }, "Logo cleared"),
+      },
+      {
+        id: "meta-reset",
+        group: "Recovery & Re-Scrape",
+        label: "Reset to Clean Filename & Re-Scrape",
+        hint: "Purge wrong linked metadata/artwork, restore filename title, and re-scrape",
+        valueLabel: "Run Reset & Scrape",
+        isOverridden: false,
+        onActivate: () => handleResetMetadata(true),
+      },
+    ];
+  }, [game, platform, platformDefs, platforms]);
+
   const triggerOverviewItem = async (idx: number) => {
     if (!game) return;
     if (idx === 0) {
@@ -575,24 +876,16 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
       await api.setGameFlag(game.id, "favorite", !game.favorite);
       await loadAll();
     } else if (idx === 2) {
-      openKeyboard({
-        title: "Edit Game Title Metadata",
-        initial: game.title,
-        onSubmit: async (v) => {
-          if (!v.trim()) return;
-          await api.renameGame(game.id, v);
-          await loadAll();
-          await refreshOverview();
-        },
-      });
+      openMetaModal();
     } else if (idx === 3) {
       setHotkeyModalOpen(true);
     } else if (idx === 4) {
       setFetchingMeta(true);
       try {
-        const updated = await api.fetchGameMetadata(game.id);
+        const updated = await api.fetchGameMetadata(game.id, true);
         setGame(updated);
-        pushToast("Synopsis & box art refreshed", "success");
+        await refreshOverview();
+        pushToast("Synopsis & box art force-refreshed", "success");
       } catch (e) {
         pushToast(String(e), "error");
       } finally {
@@ -606,6 +899,96 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
       setTabIdx(3);
     }
   };
+
+  // Metadata Fixer & Editor Modal input handler (priority 12)
+  usePad(
+    (btn) => {
+      if (!metaModalOpen) return false;
+      if (btn === "b") {
+        setMetaModalOpen(false);
+        return true;
+      }
+      if (btn === "lb" || btn === "rb") {
+        setMetaMode((m) => (m === "search" ? "manual" : "search"));
+        setMetaFocusIdx(0);
+        return true;
+      }
+      if (metaMode === "search") {
+        // Focus items in search mode:
+        // 0: Search Query input bar (A opens keyboard to search)
+        // 1..metaCandidates.length: Candidate cards (A applies candidate)
+        const maxIdx = metaCandidates.length;
+        if (btn === "up") {
+          setMetaFocusIdx((i) => Math.max(0, i - 1));
+          return true;
+        }
+        if (btn === "down") {
+          setMetaFocusIdx((i) => Math.min(maxIdx, i + 1));
+          return true;
+        }
+        if (btn === "x") {
+          openKeyboard({
+            title: "Search Game Title to Fix Metadata Match",
+            initial: metaSearchQuery || game?.title || "",
+            onSubmit: (v) => {
+              if (v.trim()) runCandidateSearch(v.trim());
+            },
+          });
+          return true;
+        }
+        if (btn === "y") {
+          handleResetMetadata(false);
+          return true;
+        }
+        if (btn === "a") {
+          if (metaFocusIdx === 0) {
+            openKeyboard({
+              title: "Search Game Title to Fix Metadata Match",
+              initial: metaSearchQuery || game?.title || "",
+              onSubmit: (v) => {
+                if (v.trim()) runCandidateSearch(v.trim());
+              },
+            });
+          } else {
+            const cand = metaCandidates[metaFocusIdx - 1];
+            if (cand) handleApplyCandidate(cand);
+          }
+          return true;
+        }
+      } else {
+        const maxIdx = Math.max(0, manualMetaRows.length - 1);
+        const safeIdx = Math.min(metaFocusIdx, maxIdx);
+        const row = manualMetaRows[safeIdx];
+        if (btn === "up") {
+          setMetaFocusIdx((i) => Math.max(0, i - 1));
+          return true;
+        }
+        if (btn === "down") {
+          setMetaFocusIdx((i) => Math.min(maxIdx, i + 1));
+          return true;
+        }
+        if (btn === "left" && row?.onStep) {
+          row.onStep(-1);
+          return true;
+        }
+        if (btn === "right" && row?.onStep) {
+          row.onStep(1);
+          return true;
+        }
+        if (btn === "a" && row?.onActivate) {
+          row.onActivate();
+          return true;
+        }
+        if (btn === "y" && row?.onClear) {
+          row.onClear();
+          return true;
+        }
+      }
+      return true;
+    },
+    12,
+    metaModalOpen
+  );
 
   // Hotkey Modal input handler (priority 10)
   usePad(
@@ -820,8 +1203,9 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
                   }`}
                   onMouseEnter={() => setOverviewFocusIdx(2)}
                   onClick={() => triggerOverviewItem(2)}
+                  title="Fix Wrong Linked Metadata & Edit Artwork"
                 >
-                  ✎ Edit Meta
+                  ✎ Fix / Edit Meta
                 </button>
                 <button
                   className={`op-pill ${
@@ -1280,6 +1664,246 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
           </div>
         )}
       </main>
+
+      {/* Adjust & Fix Linked Game Metadata Modal */}
+      {metaModalOpen && (
+        <div className="modal-backdrop" onClick={() => setMetaModalOpen(false)}>
+          <div className="meta-fixer-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="qd-drawer-header">
+              <div>
+                <span className="qd-drawer-eyebrow">Metadata &amp; Artwork Link Manager</span>
+                <h3 className="meta-fixer-title">Adjust &amp; Fix Linked Metadata</h3>
+              </div>
+              <div className="meta-fixer-tabs">
+                <span className="pill-hint">LB</span>
+                <button
+                  className={`game-tab ${metaMode === "search" ? "active" : ""}`}
+                  onClick={() => {
+                    setMetaMode("search");
+                    setMetaFocusIdx(0);
+                  }}
+                >
+                  [🔍 Search &amp; Fix Match]
+                </button>
+                <button
+                  className={`game-tab ${metaMode === "manual" ? "active" : ""}`}
+                  onClick={() => {
+                    setMetaMode("manual");
+                    setMetaFocusIdx(0);
+                  }}
+                >
+                  [✎ Manual Fields &amp; Artwork]
+                </button>
+                <span className="pill-hint">RB</span>
+              </div>
+              <button className="qd-close-btn" onClick={() => setMetaModalOpen(false)}>
+                <span className="xbox-btn btn-b">B</span>
+                <span>Close</span>
+              </button>
+            </div>
+
+            <div className="meta-fixer-filebar">
+              <span>ROM / Target File:</span>
+              <code>{game.path}</code>
+            </div>
+
+            {metaMode === "search" ? (
+              <div className="meta-search-pane">
+                <div
+                  className={`meta-search-bar ${metaFocusIdx === 0 ? "is-focused" : ""}`}
+                  onMouseEnter={() => setMetaFocusIdx(0)}
+                >
+                  <div className="meta-search-input-wrap">
+                    <span className="meta-search-icon">🔍</span>
+                    <input
+                      type="text"
+                      className="meta-search-input"
+                      value={metaSearchQuery}
+                      placeholder="Enter correct game title to search matches…"
+                      onChange={(e) => setMetaSearchQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.stopPropagation();
+                          runCandidateSearch(metaSearchQuery);
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="meta-search-actions">
+                    <button
+                      className="btn-ghost btn-sm"
+                      onClick={() =>
+                        openKeyboard({
+                          title: "Search Game Title to Fix Metadata Match",
+                          initial: metaSearchQuery || game.title,
+                          onSubmit: (v) => {
+                            if (v.trim()) runCandidateSearch(v.trim());
+                          },
+                        })
+                      }
+                    >
+                      <span className="xbox-btn btn-x">X</span>
+                      <span>Keyboard</span>
+                    </button>
+                    <button
+                      className="btn-play-emerald btn-sm"
+                      onClick={() => runCandidateSearch(metaSearchQuery)}
+                      disabled={searchingCandidates}
+                    >
+                      <span>{searchingCandidates ? "Searching…" : "Search Matches"}</span>
+                    </button>
+                    <button
+                      className="btn-ghost btn-sm"
+                      onClick={() => handleResetMetadata(false)}
+                      title="Strip wrong metadata and restore clean filename (Y)"
+                    >
+                      <span className="xbox-btn btn-y">Y</span>
+                      <span>Reset to File</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="meta-candidates-list">
+                  {searchingCandidates ? (
+                    <div className="meta-candidates-empty">
+                      ⟳ Querying Libretro Boxart CDN, IGDB &amp; Steam Store for &ldquo;{metaSearchQuery}&rdquo;…
+                    </div>
+                  ) : metaCandidates.length === 0 ? (
+                    <div className="meta-candidates-empty">
+                      No matches found for &ldquo;{metaSearchQuery}&rdquo;. Try another search query or switch to [Manual Fields &amp; Artwork].
+                    </div>
+                  ) : (
+                    metaCandidates.map((cand, idx) => {
+                      const focused = metaFocusIdx === idx + 1;
+                      const thumb = mediaSrc(cand.cover) || mediaSrc(cand.hero);
+                      return (
+                        <div
+                          key={`${cand.source}-${cand.title}-${idx}`}
+                          className={`meta-candidate-card ${focused ? "is-focused" : ""}`}
+                          onMouseEnter={() => setMetaFocusIdx(idx + 1)}
+                          onClick={() => handleApplyCandidate(cand)}
+                        >
+                          <div className="meta-candidate-thumb">
+                            {thumb ? (
+                              <img src={thumb} alt={cand.title} loading="lazy" />
+                            ) : (
+                              <div className="meta-candidate-noart">No Art</div>
+                            )}
+                          </div>
+                          <div className="meta-candidate-info">
+                            <div className="meta-candidate-top">
+                              <strong>{cand.title}</strong>
+                              <div className="meta-candidate-badges">
+                                <span className={`meta-source-pill src-${cand.source}`}>
+                                  {cand.source.toUpperCase()}
+                                </span>
+                                {cand.releaseDate && (
+                                  <span className="badge-glass">{cand.releaseDate}</span>
+                                )}
+                                {cand.region && <span className="badge-glass">{cand.region}</span>}
+                                {cand.genre && <span className="badge-mono">{cand.genre}</span>}
+                              </div>
+                            </div>
+                            {(cand.developer || cand.publisher) && (
+                              <div className="meta-candidate-credits">
+                                {cand.developer && <span>Dev: {cand.developer}</span>}
+                                {cand.publisher && <span>Pub: {cand.publisher}</span>}
+                              </div>
+                            )}
+                            {cand.description && (
+                              <p className="meta-candidate-desc">{cand.description}</p>
+                            )}
+                          </div>
+                          <div className="meta-candidate-cta">
+                            <button
+                              className="btn-play-emerald btn-sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleApplyCandidate(cand);
+                              }}
+                            >
+                              <span className="xbox-btn btn-a">A</span>
+                              <span>Link Match</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="meta-manual-pane">
+                <div className="settings-rows">
+                  {manualMetaRows.map((r, idx) => {
+                    const prevGroup = idx > 0 ? manualMetaRows[idx - 1].group : null;
+                    const isFocused = idx === Math.min(metaFocusIdx, manualMetaRows.length - 1);
+                    return (
+                      <React.Fragment key={r.id}>
+                        {r.group !== prevGroup && (
+                          <div className="settings-group-header">{r.group}</div>
+                        )}
+                        <div
+                          className={`setting-row ${isFocused ? "focused" : ""} ${
+                            r.isOverridden ? "overridden" : ""
+                          }`}
+                          onMouseEnter={() => setMetaFocusIdx(idx)}
+                          onClick={() => r.onActivate?.()}
+                        >
+                          <div className="setting-row-left">
+                            <div className="setting-row-title">
+                              <span>{r.label}</span>
+                              {r.isOverridden && <span className="override-dot">SET</span>}
+                            </div>
+                            <div className="setting-row-hint">{r.hint}</div>
+                          </div>
+                          <div className="setting-row-right">
+                            {r.onStep && (
+                              <button
+                                className="step-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  r.onStep?.(-1);
+                                }}
+                              >
+                                ◀
+                              </button>
+                            )}
+                            <span className="setting-value">{r.valueLabel}</span>
+                            {r.onStep && (
+                              <button
+                                className="step-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  r.onStep?.(1);
+                                }}
+                              >
+                                ▶
+                              </button>
+                            )}
+                            {r.onClear && r.isOverridden && (
+                              <button
+                                className="reset-pill"
+                                title="Clear / Reset Field (Y)"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  r.onClear?.();
+                                }}
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </React.Fragment>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Custom Hotkey Mapper Modal (Y Button) */}
       {hotkeyModalOpen && (

@@ -110,7 +110,40 @@ export interface Game {
     description?: string;
     screenshots?: string[];
     titleLocked?: number;
+    metadataLocked?: number;
+    scrapedAt?: number;
   };
+}
+
+export interface MetadataCandidate {
+  source: "libretro" | "igdb" | "steam" | "local" | string;
+  title: string;
+  releaseDate: string | null;
+  developer: string | null;
+  publisher: string | null;
+  genre: string | null;
+  description: string | null;
+  cover: string | null;
+  hero: string | null;
+  logo: string | null;
+  region: string | null;
+  serial: string | null;
+  steamAppId: number | null;
+}
+
+export interface GameMetadataUpdate {
+  title?: string | null;
+  platform?: string | null;
+  region?: string | null;
+  serial?: string | null;
+  cover?: string | null;
+  hero?: string | null;
+  logo?: string | null;
+  developer?: string | null;
+  publisher?: string | null;
+  releaseDate?: string | null;
+  genre?: string | null;
+  description?: string | null;
 }
 
 export interface ScanDir {
@@ -297,7 +330,16 @@ export const api = {
   addManualGame: (path: string, title: string | null, platform: string) =>
     invoke<number>("add_manual_game", { path, title, platform }),
   getSessions: (id: number) => invoke<Session[]>("get_sessions", { id }),
-  fetchGameMetadata: (id: number) => invoke<Game>("fetch_game_metadata", { id }),
+  fetchGameMetadata: (id: number, force?: boolean, query?: string | null) =>
+    invoke<Game>("fetch_game_metadata", { id, force: force ?? false, query: query ?? null }),
+  searchMetadataCandidates: (id: number, query?: string | null) =>
+    invoke<MetadataCandidate[]>("search_metadata_candidates", { id, query: query ?? null }),
+  applyMetadataCandidate: (id: number, candidate: MetadataCandidate) =>
+    invoke<Game>("apply_metadata_candidate", { id, candidate }),
+  updateGameMetadata: (id: number, patch: GameMetadataUpdate) =>
+    invoke<Game>("update_game_metadata", { id, patch }),
+  resetGameMetadata: (id: number, rescrape = false) =>
+    invoke<Game>("reset_game_metadata", { id, rescrape }),
   fetchPlatformMetadata: (platform: string) =>
     invoke<number>("fetch_platform_metadata", { platform }),
   getIgdbCredentials: () => invoke<IgdbCredentials>("get_igdb_credentials"),
