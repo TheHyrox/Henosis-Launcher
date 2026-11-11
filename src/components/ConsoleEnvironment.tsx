@@ -50,19 +50,16 @@ export const ConsoleEnvironment: React.FC<ConsoleEnvironmentProps> = ({
 
           <path
             className="wiiu-wave wave-1"
-            filter="url(#wiiu-glow)"
             fill="url(#wiiu-grad1)"
             d="M-100,320 C320,180 540,480 920,280 C1200,140 1380,390 1600,240 L1600,900 L-100,900 Z"
           />
           <path
             className="wiiu-wave wave-2"
-            filter="url(#wiiu-glow)"
             fill="url(#wiiu-grad2)"
             d="M-80,480 C260,340 680,620 1080,380 C1320,240 1480,460 1600,380 L1600,900 L-80,900 Z"
           />
           <path
             className="wiiu-wave wave-3"
-            filter="url(#wiiu-glow)"
             fill="url(#wiiu-grad3)"
             d="M-120,620 C220,520 620,740 1040,560 C1360,420 1480,590 1600,540 L1600,900 L-120,900 Z"
           />
@@ -102,13 +99,11 @@ export const ConsoleEnvironment: React.FC<ConsoleEnvironmentProps> = ({
 
           <path
             className="switch-wave switch-wave-1"
-            filter="url(#switch-glow)"
             fill="url(#switch-scarlet)"
             d="M-50,220 Q380,80 720,260 T1500,160 L1500,900 L-50,900 Z"
           />
           <path
             className="switch-wave switch-wave-2"
-            filter="url(#switch-glow)"
             fill="url(#switch-scarlet)"
             d="M-50,420 Q480,280 880,480 T1500,360 L1500,900 L-50,900 Z"
           />
@@ -164,7 +159,6 @@ export const ConsoleEnvironment: React.FC<ConsoleEnvironmentProps> = ({
           {/* Flowing atmospheric waves reminiscent of the PS3 / PSP XMB ribbon */}
           <path
             className="ps-wave ps-wave-1"
-            filter="url(#ps-glow)"
             fill="url(#ps-indigo)"
             d="M-50,440 C320,260 620,580 980,380 C1240,240 1380,420 1500,360 L1500,900 L-50,900 Z"
           />
@@ -177,7 +171,6 @@ export const ConsoleEnvironment: React.FC<ConsoleEnvironmentProps> = ({
           />
           <path
             className="ps-wave ps-wave-2"
-            filter="url(#ps-glow)"
             fill="url(#ps-indigo)"
             d="M-50,560 C380,420 680,680 1060,500 C1300,380 1400,540 1500,480 L1500,900 L-50,900 Z"
           />
@@ -240,7 +233,6 @@ export const ConsoleEnvironment: React.FC<ConsoleEnvironmentProps> = ({
             stroke="url(#xbox-neon-line)"
             strokeWidth="3.2"
             fill="none"
-            filter="url(#xbox-glow)"
             d="M-50,680 C360,540 680,220 1200,160 C1380,140 1460,200 1500,240"
           />
           <path
@@ -261,7 +253,6 @@ export const ConsoleEnvironment: React.FC<ConsoleEnvironmentProps> = ({
 
           <path
             className="xbox-aurora-sweep"
-            filter="url(#xbox-glow)"
             fill="url(#xbox-emerald)"
             d="M-50,900 L-50,720 C420,580 720,300 1200,260 L1500,280 L1500,900 Z"
           />

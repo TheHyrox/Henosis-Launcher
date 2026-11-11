@@ -56,7 +56,13 @@ export interface GameSettings {
   vsync?: boolean | null;
   fpsLimit?: number | null;
   aspectRatio?: string | null;
+  screenLayout?: string | null;
   fullscreen?: boolean | null;
+  dockedMode?: boolean | null;
+  scalingFilter?: string | null;
+  bootMode?: string | null;
+  render3d?: string | null;
+  cpuOverclock?: number | null;
   inputProfile?: string | null;
   launchArgs?: string | null;
   env?: string[] | null;

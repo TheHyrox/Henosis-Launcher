@@ -38,7 +38,7 @@ pub static PRESETS: &[Preset] = &[
          "3do", "atari2600", "atari7800", "lynx", "jaguar", "wonderswan", "msx", "c64", "pokemini"],
         ["retroarch"], ["org.libretro.RetroArch"], ["retroarch"],
         "-L {core} {settings} {rom}",
-        ["core", "graphicsApi", "vsync", "aspectRatio", "fullscreen", "advanced"],
+        ["core", "graphicsApi", "vsync", "aspectRatio", "screenLayout", "bootMode", "fullscreen", "advanced"],
         "Per-game options are written to a temporary config passed with --appendconfig. Advanced lines use RetroArch cfg syntax: key = \"value\"."),
     preset!("duckstation", "DuckStation", ["psx"],
         ["duckstation-qt", "duckstation"], ["org.duckstation.DuckStation"], ["duckstation"],
@@ -62,7 +62,7 @@ pub static PRESETS: &[Preset] = &[
     preset!("dolphin", "Dolphin", ["gc", "wii"],
         ["dolphin-emu", "dolphin-emu-nogui"], ["org.DolphinEmu.dolphin-emu"], ["dolphin"],
         "-b {settings} -e {rom}",
-        ["graphicsApi", "resolutionScale", "vsync", "aspectRatio", "fullscreen", "advanced"],
+        ["graphicsApi", "resolutionScale", "vsync", "aspectRatio", "fullscreen", "cpuOverclock", "render3d", "advanced"],
         "Settings are applied through Dolphin -C overrides (never written to your global config). Advanced: System.Section.Key=Value."),
     preset!("cemu", "Cemu", ["wiiu"],
         ["cemu", "Cemu"], ["info.cemu.Cemu"], ["cemu"],
@@ -72,22 +72,22 @@ pub static PRESETS: &[Preset] = &[
         "{settings} {rom}", ["fullscreen", "graphicsApi"], ""),
     preset!("eden", "Eden", ["switch"],
         ["eden", "eden-cli"], ["dev.eden_emu.eden"], ["eden"],
-        "{settings} -g {rom}", ["fullscreen"], ""),
+        "{settings} -g {rom}", ["fullscreen", "dockedMode", "resolutionScale", "scalingFilter", "advanced"], ""),
     preset!("citron", "Citron", ["switch"],
         ["citron"], ["org.citron_emu.citron"], ["citron"],
-        "{settings} -g {rom}", ["fullscreen"], ""),
+        "{settings} -g {rom}", ["fullscreen", "dockedMode", "resolutionScale", "scalingFilter", "advanced"], ""),
     preset!("sudachi", "Sudachi", ["switch"],
         ["sudachi"], [], ["sudachi"],
-        "{settings} -g {rom}", ["fullscreen"], ""),
+        "{settings} -g {rom}", ["fullscreen", "dockedMode", "resolutionScale", "scalingFilter", "advanced"], ""),
     preset!("azahar", "Azahar", ["n3ds"],
         ["azahar", "azahar-qt"], ["org.azahar_emu.Azahar"], ["azahar"],
-        "{settings} {rom}", ["fullscreen"], ""),
+        "{settings} {rom}", ["fullscreen", "screenLayout", "resolutionScale", "render3d", "advanced"], ""),
     preset!("lime3ds", "Lime3DS", ["n3ds"],
         ["lime3ds", "lime3ds-gui"], ["io.github.lime3ds.Lime3DS"], ["lime3ds"],
-        "{settings} {rom}", ["fullscreen"], ""),
+        "{settings} {rom}", ["fullscreen", "screenLayout", "resolutionScale", "render3d", "advanced"], ""),
     preset!("melonds", "melonDS", ["nds"],
         ["melonDS", "melonds"], ["net.kuribo64.melonDS"], ["melonds"],
-        "{settings} {rom}", ["fullscreen"], ""),
+        "{settings} {rom}", ["fullscreen", "screenLayout", "bootMode", "resolutionScale", "advanced"], ""),
     preset!("mgba", "mGBA", ["gba", "gb", "gbc"],
         ["mgba-qt", "mgba"], ["io.mgba.mGBA"], ["mgba"],
         "{settings} {rom}", ["fullscreen"], ""),
@@ -423,6 +423,48 @@ pub fn build_command(emu: &Emulator, ctx: &BuildContext) -> Result<CommandSpec, 
                 Some("stretch") => cfg.extend(["video_aspect_ratio_auto = \"false\"".into(), "video_scale_integer = \"false\"".into(), "aspect_ratio_index = \"24\"".into()]),
                 _ => {}
             }
+            if let Some(layout) = s.screen_layout.as_deref() {
+                match layout {
+                    "top-bottom" => {
+                        cfg.push("melonds_screen_layout = \"Top/Bottom\"".into());
+                        cfg.push("desmume_screens_layout = \"top/bottom\"".into());
+                        cfg.push("citra_layout_option = \"Default\"".into());
+                    }
+                    "side-by-side" => {
+                        cfg.push("melonds_screen_layout = \"Left/Right\"".into());
+                        cfg.push("desmume_screens_layout = \"left/right\"".into());
+                        cfg.push("citra_layout_option = \"Side by Side\"".into());
+                    }
+                    "hybrid" => {
+                        cfg.push("melonds_screen_layout = \"Hybrid Top\"".into());
+                        cfg.push("desmume_screens_layout = \"hybrid/top\"".into());
+                        cfg.push("citra_layout_option = \"Large Screen\"".into());
+                    }
+                    "single-top" => {
+                        cfg.push("melonds_screen_layout = \"Top Only\"".into());
+                        cfg.push("desmume_screens_layout = \"top only\"".into());
+                        cfg.push("citra_layout_option = \"Single Screen\"".into());
+                    }
+                    "single-bottom" => {
+                        cfg.push("melonds_screen_layout = \"Bottom Only\"".into());
+                        cfg.push("desmume_screens_layout = \"bottom only\"".into());
+                    }
+                    _ => {}
+                }
+            }
+            if let Some(boot) = s.boot_mode.as_deref() {
+                match boot {
+                    "direct" => {
+                        cfg.push("melonds_boot_directly = \"enabled\"".into());
+                        cfg.push("desmume_boot_into_bios = \"disabled\"".into());
+                    }
+                    "firmware" => {
+                        cfg.push("melonds_boot_directly = \"disabled\"".into());
+                        cfg.push("desmume_boot_into_bios = \"enabled\"".into());
+                    }
+                    _ => {}
+                }
+            }
             if let Some(adv) = &s.advanced {
                 cfg.extend(adv.iter().filter(|l| !l.trim().is_empty()).cloned());
             }
@@ -462,6 +504,24 @@ pub fn build_command(emu: &Emulator, ctx: &BuildContext) -> Result<CommandSpec, 
                 };
                 c(format!("GFX.Settings.AspectRatio={idx}"));
             }
+            if let Some(oc) = s.cpu_overclock {
+                if oc == 100 {
+                    c("Core.OverclockEnable=False".into());
+                    c("Core.Overclock=1.0".into());
+                } else {
+                    c("Core.OverclockEnable=True".into());
+                    let mult = (oc as f32) / 100.0;
+                    c(format!("Core.Overclock={:.2}", mult));
+                }
+            }
+            if let Some(r3d) = s.render_3d.as_deref() {
+                match r3d {
+                    "side-by-side" => c("GFX.Stereoscopy.StereoMode=1".into()),
+                    "anaglyph" => c("GFX.Stereoscopy.StereoMode=3".into()),
+                    "off" => c("GFX.Stereoscopy.StereoMode=0".into()),
+                    _ => {}
+                }
+            }
             for a in s.advanced.iter().flatten().filter(|l| !l.trim().is_empty()) {
                 c(a.clone());
             }
@@ -475,9 +535,175 @@ pub fn build_command(emu: &Emulator, ctx: &BuildContext) -> Result<CommandSpec, 
             }
         }
         "duckstation" | "pcsx2" => settings_args.push(if fullscreen { "-fullscreen" } else { "-nofullscreen" }.into()),
-        "cemu" | "eden" | "citron" | "sudachi" | "azahar" | "lime3ds" | "melonds" | "mgba" => {
+        "cemu" | "mgba" => {
             if fullscreen {
                 settings_args.push("-f".into());
+            }
+        }
+        "melonds" => {
+            if fullscreen {
+                settings_args.push("-f".into());
+            }
+            if let Some(boot) = s.boot_mode.as_deref() {
+                match boot {
+                    "direct" => settings_args.extend(["-b".into(), "always".into()]),
+                    "firmware" => settings_args.extend(["-b".into(), "never".into()]),
+                    _ => {}
+                }
+            }
+            if let Some(home) = dirs::home_dir() {
+                let toml_path = home.join(".config/melonDS/melonDS.toml");
+                let mut updates = Vec::new();
+                if let Some(layout) = s.screen_layout.as_deref() {
+                    match layout {
+                        "top-bottom" => {
+                            updates.push(("Instance0.Window0", "ScreenLayout", "0"));
+                            updates.push(("Instance0.Window0", "ScreenSizing", "0"));
+                        }
+                        "side-by-side" => {
+                            updates.push(("Instance0.Window0", "ScreenLayout", "1"));
+                            updates.push(("Instance0.Window0", "ScreenSizing", "0"));
+                        }
+                        "hybrid" => {
+                            updates.push(("Instance0.Window0", "ScreenLayout", "2"));
+                            updates.push(("Instance0.Window0", "ScreenSizing", "1"));
+                        }
+                        "single-top" => {
+                            updates.push(("Instance0.Window0", "ScreenLayout", "0"));
+                            updates.push(("Instance0.Window0", "ScreenSizing", "4"));
+                        }
+                        "single-bottom" => {
+                            updates.push(("Instance0.Window0", "ScreenLayout", "0"));
+                            updates.push(("Instance0.Window0", "ScreenSizing", "5"));
+                        }
+                        _ => {}
+                    }
+                }
+                let scale_str;
+                if let Some(scale) = s.resolution_scale {
+                    if scale > 1 {
+                        updates.push(("3D", "Renderer", "1"));
+                        scale_str = scale.to_string();
+                        updates.push(("3D.GL", "Scale", &scale_str));
+                    } else {
+                        updates.push(("3D", "Renderer", "0"));
+                    }
+                }
+                if !updates.is_empty() {
+                    let _ = update_toml_file(&toml_path, &updates);
+                }
+            }
+        }
+        "azahar" | "lime3ds" => {
+            if fullscreen {
+                settings_args.push("-f".into());
+            }
+            if let Some(home) = dirs::home_dir() {
+                let emu_name = if emu.preset == "lime3ds" { "lime3ds" } else { "azahar-emu" };
+                let config_base = home.join(format!(".config/{emu_name}"));
+                let mut updates = Vec::new();
+
+                if let Some(layout) = s.screen_layout.as_deref() {
+                    let opt = match layout {
+                        "top-bottom" => "0",
+                        "single-top" => "1",
+                        "hybrid" => "2",
+                        "side-by-side" => "3",
+                        "separate" => "4",
+                        _ => "0",
+                    };
+                    updates.push(("Layout", "layout_option", opt));
+                    updates.push(("Layout", "layout_option\\default", "false"));
+                    updates.push(("Layout", "layout_option\\use_global", "false"));
+                }
+                if let Some(r3d) = s.render_3d.as_deref() {
+                    let opt = match r3d {
+                        "off" => "0",
+                        "side-by-side" => "1",
+                        "anaglyph" => "2",
+                        _ => "0",
+                    };
+                    updates.push(("Layout", "render_3d", opt));
+                    updates.push(("Layout", "render_3d\\default", "false"));
+                    updates.push(("Layout", "render_3d\\use_global", "false"));
+                }
+                let scale_str;
+                if let Some(scale) = s.resolution_scale {
+                    scale_str = scale.to_string();
+                    updates.push(("Renderer", "resolution_factor", &scale_str));
+                    updates.push(("Renderer", "resolution_factor\\default", "false"));
+                    updates.push(("Renderer", "resolution_factor\\use_global", "false"));
+                }
+
+                if !updates.is_empty() {
+                    let _ = update_ini_file(&config_base.join("qt-config.ini"), &updates);
+                    if let Some(tid) = extract_title_id(game) {
+                        let _ = update_ini_file(&config_base.join("custom").join(format!("{tid}.ini")), &updates);
+                    }
+                }
+            }
+        }
+        "eden" | "citron" | "sudachi" => {
+            if fullscreen {
+                settings_args.push("-f".into());
+            }
+            if let Some(home) = dirs::home_dir() {
+                let emu_name = emu.preset.as_str();
+                let config_base = home.join(format!(".config/{emu_name}"));
+                let portable_dir = Path::new(&emu.exec).parent().unwrap_or(Path::new("")).join(emu_name);
+                let mut updates = Vec::new();
+
+                if let Some(docked) = s.docked_mode {
+                    let val = if docked { "true" } else { "false" };
+                    updates.push(("System", "use_docked_mode", val));
+                    updates.push(("System", "use_docked_mode\\default", "false"));
+                    updates.push(("System", "use_docked_mode\\use_global", "false"));
+                }
+                let scale_str;
+                if let Some(scale) = s.resolution_scale {
+                    let setup_val = match scale {
+                        1 => "2",
+                        2 => "3",
+                        3 => "4",
+                        4 => "5",
+                        _ => "2",
+                    };
+                    scale_str = setup_val.to_string();
+                    updates.push(("Renderer", "resolution_setup", &scale_str));
+                    updates.push(("Renderer", "resolution_setup\\default", "false"));
+                    updates.push(("Renderer", "resolution_setup\\use_global", "false"));
+                }
+                if let Some(filter) = s.scaling_filter.as_deref() {
+                    let opt = match filter {
+                        "nearest" => "0",
+                        "bilinear" => "1",
+                        "bicubic" => "2",
+                        "gaussian" => "3",
+                        "scaleforce" => "4",
+                        "fsr" => "5",
+                        _ => "1",
+                    };
+                    updates.push(("Renderer", "scaling_filter", opt));
+                    updates.push(("Renderer", "scaling_filter\\default", "false"));
+                    updates.push(("Renderer", "scaling_filter\\use_global", "false"));
+                    if filter == "fsr" {
+                        updates.push(("Renderer", "fsr_sharpening_slider", "80"));
+                        updates.push(("Renderer", "fsr_sharpening_slider\\use_global", "false"));
+                    }
+                }
+
+                if !updates.is_empty() {
+                    let _ = update_ini_file(&config_base.join("qt-config.ini"), &updates);
+                    if portable_dir.is_dir() {
+                        let _ = update_ini_file(&portable_dir.join("qt-config.ini"), &updates);
+                    }
+                    if let Some(tid) = extract_title_id(game) {
+                        let _ = update_ini_file(&config_base.join("custom").join(format!("{tid}.ini")), &updates);
+                        if portable_dir.is_dir() {
+                            let _ = update_ini_file(&portable_dir.join("custom").join(format!("{tid}.ini")), &updates);
+                        }
+                    }
+                }
             }
         }
         "ryujinx" => {
@@ -628,4 +854,135 @@ pub fn wrap(
         CommandSpec { program: p, args: chain, env: env.clone(), workdir }
     };
     Ok(spec)
+}
+
+fn extract_title_id(game: &Game) -> Option<String> {
+    if let Some(s) = &game.serial {
+        if s.len() == 16 && s.chars().all(|c| c.is_ascii_hexdigit()) {
+            return Some(s.to_uppercase());
+        }
+    }
+    let p = Path::new(&game.path);
+    let stem = p.file_stem()?.to_string_lossy();
+    for part in stem.split(|c| c == '[' || c == ']' || c == '(' || c == ')' || c == ' ' || c == '_') {
+        let trimmed = part.trim();
+        if trimmed.len() == 16 && trimmed.chars().all(|c| c.is_ascii_hexdigit()) {
+            return Some(trimmed.to_uppercase());
+        }
+    }
+    None
+}
+
+fn update_ini_file(path: &Path, updates: &[(&str, &str, &str)]) -> std::io::Result<()> {
+    let content = if path.exists() {
+        std::fs::read_to_string(path).unwrap_or_default()
+    } else {
+        String::new()
+    };
+    let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+
+    for (target_sec, target_key, target_val) in updates {
+        let sec_header = format!("[{}]", target_sec);
+        let mut sec_start = None;
+        let mut sec_end = None;
+
+        for (i, line) in lines.iter().enumerate() {
+            let trimmed = line.trim();
+            if trimmed.eq_ignore_ascii_case(&sec_header) {
+                sec_start = Some(i);
+            } else if sec_start.is_some() && trimmed.starts_with('[') && trimmed.ends_with(']') {
+                sec_end = Some(i);
+                break;
+            }
+        }
+
+        if let Some(start) = sec_start {
+            let end = sec_end.unwrap_or(lines.len());
+            let mut found_idx = None;
+            for i in (start + 1)..end {
+                let l = lines[i].trim();
+                if let Some((k, _)) = l.split_once('=') {
+                    if k.trim().eq_ignore_ascii_case(target_key) {
+                        found_idx = Some(i);
+                        break;
+                    }
+                }
+            }
+
+            let new_line = format!("{}={}", target_key, target_val);
+            if let Some(idx) = found_idx {
+                lines[idx] = new_line;
+            } else {
+                lines.insert(end, new_line);
+            }
+        } else {
+            if !lines.is_empty() && !lines.last().map(|l| l.trim().is_empty()).unwrap_or(false) {
+                lines.push(String::new());
+            }
+            lines.push(sec_header);
+            lines.push(format!("{}={}", target_key, target_val));
+        }
+    }
+
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    std::fs::write(path, lines.join("\n") + "\n")
+}
+
+fn update_toml_file(path: &Path, updates: &[(&str, &str, &str)]) -> std::io::Result<()> {
+    let content = if path.exists() {
+        std::fs::read_to_string(path).unwrap_or_default()
+    } else {
+        String::new()
+    };
+    let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+
+    for (target_sec, target_key, target_val) in updates {
+        let sec_header = format!("[{}]", target_sec);
+        let mut sec_start = None;
+        let mut sec_end = None;
+
+        for (i, line) in lines.iter().enumerate() {
+            let trimmed = line.trim();
+            if trimmed.eq_ignore_ascii_case(&sec_header) {
+                sec_start = Some(i);
+            } else if sec_start.is_some() && trimmed.starts_with('[') && trimmed.ends_with(']') {
+                sec_end = Some(i);
+                break;
+            }
+        }
+
+        if let Some(start) = sec_start {
+            let end = sec_end.unwrap_or(lines.len());
+            let mut found_idx = None;
+            for i in (start + 1)..end {
+                let l = lines[i].trim();
+                if let Some((k, _)) = l.split_once('=') {
+                    if k.trim().eq_ignore_ascii_case(target_key) {
+                        found_idx = Some(i);
+                        break;
+                    }
+                }
+            }
+
+            let new_line = format!("{} = {}", target_key, target_val);
+            if let Some(idx) = found_idx {
+                lines[idx] = new_line;
+            } else {
+                lines.insert(end, new_line);
+            }
+        } else {
+            if !lines.is_empty() && !lines.last().map(|l| l.trim().is_empty()).unwrap_or(false) {
+                lines.push(String::new());
+            }
+            lines.push(sec_header);
+            lines.push(format!("{} = {}", target_key, target_val));
+        }
+    }
+
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    std::fs::write(path, lines.join("\n") + "\n")
 }

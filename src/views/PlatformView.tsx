@@ -334,38 +334,34 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
               {visibleGames.map((g, idx) => {
                 const offset = idx - focusIdx;
                 // Only render items within visual range for 60+ FPS performance
-                if (Math.abs(offset) > 10) return null;
+                if (Math.abs(offset) > 5) return null;
 
                 const isCenter = offset === 0;
                 const absOffset = Math.abs(offset);
 
                 // Cover Flow 3D Transform computation:
-                // Center item: elevated (-26px), translated forward (+150px), facing directly front (rotateY(0deg))
-                // Adjacent items: angled inward (52deg / -52deg), stepped along X and Z with depth of field blur
+                // Center item: elevated (-36px), translated forward (+170px), facing directly front (rotateY(0deg))
+                // Adjacent items: angled inward (52deg / -52deg), stepped along X and Z
                 let transform = "";
                 let zIndex = 50 - absOffset;
-                let blurAmount = 0;
-                let brightness = 1;
+                let opacity = 1;
 
                 if (isCenter) {
                   transform = `translateX(0px) translateY(-36px) translateZ(170px) rotateY(0deg) scale(1.42)`;
                   zIndex = 100;
-                  blurAmount = 0;
-                  brightness = 1.08;
+                  opacity = 1;
                 } else if (offset < 0) {
                   // Left side items angled inward
                   const spacing = 240 + (absOffset - 1) * 115;
                   const depth = -80 - (absOffset - 1) * 55;
                   transform = `translateX(-${spacing}px) translateY(0px) translateZ(${depth}px) rotateY(52deg) scale(1.08)`;
-                  blurAmount = Math.min(5.5, absOffset * 1.4);
-                  brightness = Math.max(0.38, 1 - absOffset * 0.14);
+                  opacity = Math.max(0.42, 1 - absOffset * 0.14);
                 } else {
                   // Right side items angled inward
                   const spacing = 240 + (absOffset - 1) * 115;
                   const depth = -80 - (absOffset - 1) * 55;
                   transform = `translateX(${spacing}px) translateY(0px) translateZ(${depth}px) rotateY(-52deg) scale(1.08)`;
-                  blurAmount = Math.min(5.5, absOffset * 1.4);
-                  brightness = Math.max(0.38, 1 - absOffset * 0.14);
+                  opacity = Math.max(0.42, 1 - absOffset * 0.14);
                 }
 
                 return (
@@ -375,7 +371,7 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
                     style={{
                       transform,
                       zIndex,
-                      filter: `blur(${blurAmount}px) brightness(${brightness})`,
+                      opacity,
                     }}
                     onClick={() => {
                       if (isCenter) {

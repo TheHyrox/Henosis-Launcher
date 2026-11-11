@@ -168,7 +168,7 @@ export const HomeView: React.FC = () => {
               const offset = idx - clampedHome;
               const focused = idx === clampedHome;
               const absOffset = Math.abs(offset);
-              const blur = focused ? 0 : Math.min(4.5, absOffset * 1.3);
+              const opacity = focused ? 1 : Math.max(0.55, 1 - absOffset * 0.12);
 
               return (
                 <div
@@ -180,7 +180,7 @@ export const HomeView: React.FC = () => {
                       "--card-color": plat.color,
                       "--card-accent": plat.accent,
                       "--offset": Math.max(-4, Math.min(4, offset)),
-                      filter: `blur(${blur}px)`,
+                      opacity,
                     } as React.CSSProperties
                   }
                   onMouseEnter={() => setHomeIndex(idx)}

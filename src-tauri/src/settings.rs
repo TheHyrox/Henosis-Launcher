@@ -20,7 +20,19 @@ pub struct GameSettings {
     pub fps_limit: Option<u32>,
     /// "auto" | "4:3" | "16:9" | "stretch"
     pub aspect_ratio: Option<String>,
+    /// Dual screen layout: "top-bottom" | "side-by-side" | "hybrid" | "single-top" | "single-bottom" | "separate"
+    pub screen_layout: Option<String>,
     pub fullscreen: Option<bool>,
+    /// Nintendo Switch mode: true = Docked (1080p), false = Handheld (720p).
+    pub docked_mode: Option<bool>,
+    /// Scaling filter: "nearest" | "bilinear" | "bicubic" | "scaleforce" | "fsr"
+    pub scaling_filter: Option<String>,
+    /// Boot mode: "direct" | "firmware"
+    pub boot_mode: Option<String>,
+    /// Stereoscopic 3D mode: "off" | "side-by-side" | "anaglyph"
+    pub render_3d: Option<String>,
+    /// CPU clock percentage: 100 = stock, 150 = 1.5x, 200 = 2x
+    pub cpu_overclock: Option<u32>,
     /// Controller / input profile name understood by the emulator.
     pub input_profile: Option<String>,
     /// Extra arguments appended to the command line.
@@ -60,7 +72,8 @@ impl GameSettings {
         let mut out = self.clone();
         merge_fields!(
             out, over, emulator_id, core, graphics_api, resolution_scale, vsync, fps_limit,
-            aspect_ratio, fullscreen, input_profile, launch_args, env, gamemode, mangohud,
+            aspect_ratio, screen_layout, fullscreen, docked_mode, scaling_filter, boot_mode,
+            render_3d, cpu_overclock, input_profile, launch_args, env, gamemode, mangohud,
             gamescope, gamescope_args, config_overrides, mods_enabled, mod_links, advanced
         );
         out

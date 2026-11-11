@@ -4,7 +4,7 @@
 // Left/Right cycles option values, A activates or opens the On-Screen Keyboard / File Browser,
 // X launches the game immediately.
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   api,
   Emulator,
@@ -246,6 +246,128 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
       onClear: () => updateSettings({ aspectRatio: null }),
     });
 
+    const isDualScreen = ["nds", "n3ds", "wiiu"].includes(game.platform);
+    if (isDualScreen) {
+      const layouts: (string | null)[] = [
+        null,
+        "top-bottom",
+        "side-by-side",
+        "hybrid",
+        "single-top",
+        "single-bottom",
+        "separate",
+      ];
+      const layoutLabels: Record<string, string> = {
+        "top-bottom": "Top / Bottom (Vertical)",
+        "side-by-side": "Side by Side (Horizontal)",
+        "hybrid": "Hybrid (Main Large / Sub Small)",
+        "single-top": "Top Screen Only",
+        "single-bottom": "Touch / Bottom Screen Only",
+        "separate": "Separate Windows",
+      };
+
+      rows.push({
+        id: "screenLayout",
+        group: "Graphics & Display",
+        label: "Dual Screen Layout",
+        hint: "Screen orientation and layout for dual-screen systems",
+        valueLabel: s.screenLayout
+          ? layoutLabels[s.screenLayout] || s.screenLayout
+          : "Default (Console Standard)",
+        isOverridden: Boolean(s.screenLayout),
+        onStep: (dir) => updateSettings({ screenLayout: cycle(layouts, s.screenLayout ?? null, dir) }),
+        onActivate: () => updateSettings({ screenLayout: cycle(layouts, s.screenLayout ?? null, 1) }),
+        onClear: () => updateSettings({ screenLayout: null }),
+      });
+    }
+
+    if (["switch", "switch2"].includes(game.platform)) {
+      const modes: (boolean | null)[] = [null, true, false];
+      const modeLabels: Record<string, string> = {
+        true: "Docked (1080p · Max Performance)",
+        false: "Handheld (720p · Power Saving)",
+      };
+      rows.push({
+        id: "dockedMode",
+        group: "Graphics & Display",
+        label: "Switch Console Mode",
+        hint: "Docked mode increases GPU/CPU clocks and output resolution to 1080p",
+        valueLabel:
+          s.dockedMode !== null && s.dockedMode !== undefined
+            ? modeLabels[String(s.dockedMode)]
+            : "Default (Docked Mode)",
+        isOverridden: s.dockedMode !== null && s.dockedMode !== undefined,
+        onStep: (dir) => updateSettings({ dockedMode: cycle(modes, s.dockedMode ?? null, dir) }),
+        onActivate: () => updateSettings({ dockedMode: cycle(modes, s.dockedMode ?? null, 1) }),
+        onClear: () => updateSettings({ dockedMode: null }),
+      });
+    }
+
+    if (["switch", "switch2", "nds", "n3ds", "gc", "wii"].includes(game.platform)) {
+      const filters: (string | null)[] = [null, "fsr", "scaleforce", "bicubic", "bilinear", "nearest"];
+      const filterLabels: Record<string, string> = {
+        fsr: "AMD FSR (FidelityFX Super Resolution)",
+        scaleforce: "ScaleForce 4x (Edge Sharpening)",
+        bicubic: "Bicubic (Smooth Gradient)",
+        bilinear: "Bilinear (Standard)",
+        nearest: "Nearest-Neighbor (Sharp Pixels)",
+      };
+      rows.push({
+        id: "scalingFilter",
+        group: "Graphics & Display",
+        label: "Texture & Upscaling Filter",
+        hint: "Post-processing shader and filter for modern high-resolution displays",
+        valueLabel: s.scalingFilter
+          ? filterLabels[s.scalingFilter] || s.scalingFilter.toUpperCase()
+          : "Default (Emulator Standard)",
+        isOverridden: Boolean(s.scalingFilter),
+        onStep: (dir) => updateSettings({ scalingFilter: cycle(filters, s.scalingFilter ?? null, dir) }),
+        onActivate: () => updateSettings({ scalingFilter: cycle(filters, s.scalingFilter ?? null, 1) }),
+        onClear: () => updateSettings({ scalingFilter: null }),
+      });
+    }
+
+    if (["n3ds", "gc", "wii", "virtualboy"].includes(game.platform)) {
+      const stereos: (string | null)[] = [null, "off", "side-by-side", "anaglyph"];
+      const stereoLabels: Record<string, string> = {
+        off: "2D Monoscopic (Off)",
+        "side-by-side": "Side-by-Side (3D TV / VR)",
+        anaglyph: "Anaglyph (Red / Cyan Glasses)",
+      };
+      rows.push({
+        id: "render3d",
+        group: "Graphics & Display",
+        label: "Stereoscopic 3D Mode",
+        hint: "Render 3D depth for 3D TVs or red/cyan 3D glasses",
+        valueLabel: s.render3d
+          ? stereoLabels[s.render3d] || s.render3d
+          : "Default (Off / 2D)",
+        isOverridden: Boolean(s.render3d),
+        onStep: (dir) => updateSettings({ render3d: cycle(stereos, s.render3d ?? null, dir) }),
+        onActivate: () => updateSettings({ render3d: cycle(stereos, s.render3d ?? null, 1) }),
+        onClear: () => updateSettings({ render3d: null }),
+      });
+    }
+
+    if (["nds", "gba", "gb", "gbc"].includes(game.platform)) {
+      const boots: (string | null)[] = [null, "direct", "firmware"];
+      const bootLabels: Record<string, string> = {
+        direct: "Direct Boot (Skip Firmware / Fast)",
+        firmware: "Authentic Console BIOS / Firmware",
+      };
+      rows.push({
+        id: "bootMode",
+        group: "Graphics & Display",
+        label: "System Boot Sequence",
+        hint: "Directly launch into game ROM or boot authentic console BIOS menu",
+        valueLabel: s.bootMode ? bootLabels[s.bootMode] || s.bootMode : "Default (Direct Boot)",
+        isOverridden: Boolean(s.bootMode),
+        onStep: (dir) => updateSettings({ bootMode: cycle(boots, s.bootMode ?? null, dir) }),
+        onActivate: () => updateSettings({ bootMode: cycle(boots, s.bootMode ?? null, 1) }),
+        onClear: () => updateSettings({ bootMode: null }),
+      });
+    }
+
     const triBool: (boolean | null)[] = [null, true, false];
     const fmtBool = (v: boolean | null | undefined, def = "Default") =>
       v === true ? "Enabled" : v === false ? "Disabled" : def;
@@ -339,6 +461,29 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
         }),
       onClear: () => updateSettings({ gamescopeArgs: null }),
     });
+
+    if (["gc", "wii", "n3ds", "switch", "switch2"].includes(game.platform)) {
+      const ocChoices: (number | null)[] = [null, 100, 125, 150, 200];
+      const ocLabels: Record<number, string> = {
+        100: "100% (Stock Clock)",
+        125: "125% (Mild Boost)",
+        150: "150% (Performance Boost)",
+        200: "200% (High Speed)",
+      };
+      rows.push({
+        id: "cpuOverclock",
+        group: "Performance & Compatibility",
+        label: "Emulated CPU Clock Speed",
+        hint: "Boost emulated CPU clock frequency to eliminate frame drops in heavy games",
+        valueLabel: s.cpuOverclock
+          ? ocLabels[s.cpuOverclock] || `${s.cpuOverclock}%`
+          : "Default (100% Stock)",
+        isOverridden: Boolean(s.cpuOverclock && s.cpuOverclock !== 100),
+        onStep: (dir) => updateSettings({ cpuOverclock: cycle(ocChoices, s.cpuOverclock ?? null, dir) }),
+        onActivate: () => updateSettings({ cpuOverclock: cycle(ocChoices, s.cpuOverclock ?? null, 1) }),
+        onClear: () => updateSettings({ cpuOverclock: null }),
+      });
+    }
 
     // Controller, Launch Args, Env, Config Overrides & Mods
     rows.push({
@@ -459,6 +604,23 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
     return rows;
   }, [game, preview, compatibleEmulators, cores]);
 
+  const settingRowsRef = useRef<HTMLDivElement | null>(null);
+
+  const safeSettingIdx = Math.min(
+    settingIdx,
+    Math.max(0, settingRows.length - 1)
+  );
+
+  useEffect(() => {
+    if (tab !== "settings") return;
+    const rowEl = settingRowsRef.current?.querySelector<HTMLElement>(
+      `[data-setting-idx="${safeSettingIdx}"]`
+    );
+    if (rowEl) {
+      rowEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [safeSettingIdx, tab]);
+
   const isGameRunning = running?.gameId === game?.id;
 
   const overviewActions = useMemo(() => {
@@ -559,7 +721,7 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
     }
 
     if (tab === "settings") {
-      const row = settingRows[settingIdx];
+      const row = settingRows[safeSettingIdx];
       if (btn === "up") {
         setSettingIdx((i) => Math.max(0, i - 1));
         return true;
@@ -806,7 +968,7 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
               </div>
             )}
 
-            <div className="settings-rows">
+            <div className="settings-rows" ref={settingRowsRef}>
               {settingRows.map((r, idx) => {
                 const prevGroup = idx > 0 ? settingRows[idx - 1].group : null;
                 return (
@@ -815,7 +977,8 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
                       <div className="settings-group-header">{r.group}</div>
                     )}
                     <div
-                      className={`setting-row ${idx === settingIdx ? "focused" : ""} ${
+                      data-setting-idx={idx}
+                      className={`setting-row ${idx === safeSettingIdx ? "focused" : ""} ${
                         r.isOverridden ? "overridden" : ""
                       }`}
                       onMouseEnter={() => setSettingIdx(idx)}
@@ -936,7 +1099,7 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
                 {
                   btn: "Y",
                   label: "Reset Row to Default",
-                  onClick: () => settingRows[settingIdx]?.onClear?.(),
+                  onClick: () => settingRows[safeSettingIdx]?.onClear?.(),
                 },
               ] as const)
             : []),

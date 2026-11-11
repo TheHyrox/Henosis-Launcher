@@ -99,7 +99,7 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     (window as any).__NEXUS_REPORT?.();
-  });
+  }, [screen, running, toasts.length]);
 
   // Global fallback for Guide button when already focused
   usePad(

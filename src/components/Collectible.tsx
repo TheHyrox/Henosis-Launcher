@@ -125,6 +125,7 @@ const CaseArtwork: React.FC<{ game: Game; platform: Platform }> = ({ game, platf
           alt={game.title}
           className="case-art-img"
           loading="lazy"
+          decoding="async"
           onError={() => setBroken(true)}
         />
       ) : (
@@ -146,7 +147,7 @@ const CaseArtwork: React.FC<{ game: Game; platform: Platform }> = ({ game, platf
   );
 };
 
-export const CollectibleCard: React.FC<CollectibleProps> = ({
+const CollectibleCardComponent: React.FC<CollectibleProps> = ({
   game,
   platform,
   focused = false,
@@ -325,3 +326,5 @@ export const CollectibleCard: React.FC<CollectibleProps> = ({
     </div>
   );
 };
+
+export const CollectibleCard = React.memo(CollectibleCardComponent);
