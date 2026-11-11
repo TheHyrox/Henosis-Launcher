@@ -78,14 +78,8 @@ pub fn run() {
     // Crash recovery for any per-game config overrides left over from an interrupted session.
     launcher::restore_overrides(&data_dir.join("restore-journal.json"));
 
-    // Check for existing database (migrate from legacy nexus.sqlite if present)
-    let db_path = if data_dir.join("henosis.sqlite").exists() {
-        data_dir.join("henosis.sqlite")
-    } else if data_dir.join("nexus.sqlite").exists() {
-        data_dir.join("nexus.sqlite")
-    } else {
-        data_dir.join("henosis.sqlite")
-    };
+    // Database configuration
+    let db_path = data_dir.join("henosis.sqlite");
     let db = Db::open(&db_path).expect("open database");
     let _ = db.purge_missing();
     bootstrap(&db);

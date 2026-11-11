@@ -7,6 +7,6 @@
     "start": "node index.js",
     "test": "node test-runner.js"
   },
-  "author": "Nexus Team",
+  "author": "Henosis Team",
   "license": "MIT"
 }

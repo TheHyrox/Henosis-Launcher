@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Direct Test Runner for Nexus Launcher Wayland Application
+ * Direct Test Runner for Henosis Launcher Wayland Application
  * Connects to the test bridge on 127.0.0.1:9998, executes the complete feature suite,
  * and prints detailed results with colors.
  */
@@ -88,7 +88,7 @@ async function main() {
     );
 
     // 3. Navigation through Consoles
-    await bridgeRequest("POST", "/eval", { script: "window.__NEXUS_STORE.getState().setHomeIndex(0);" });
+    await bridgeRequest("POST", "/eval", { script: "(window.__HENOSIS_STORE || window.__NEXUS_STORE).getState().setHomeIndex(0);" });
     await sleep(150);
     const initialIndex = 0;
     await bridgeRequest("POST", "/input", { button: "right" });
@@ -171,7 +171,7 @@ async function main() {
     );
 
     // 10. Navigation Flow: Return to Home
-    await bridgeRequest("POST", "/eval", { script: "window.__NEXUS_STORE.getState().goHome();" });
+    await bridgeRequest("POST", "/eval", { script: "(window.__HENOSIS_STORE || window.__NEXUS_STORE).getState().goHome();" });
     await sleep(200);
     await bridgeRequest("POST", "/navigate", { screen: { kind: "platform", platformId: "steam" } });
     await sleep(300);
@@ -186,7 +186,7 @@ async function main() {
     );
 
     // 11. Wayland Native Screenshot Capture via Spectacle
-    const screenshotPath = "/tmp/nexus_wayland_test.png";
+    const screenshotPath = "/tmp/henosis_wayland_test.png";
     const shot = await bridgeRequest("POST", "/screenshot", { path: screenshotPath });
     const shotExists = fs.existsSync(screenshotPath) && fs.statSync(screenshotPath).size > 1000;
     record(

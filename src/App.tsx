@@ -36,8 +36,9 @@ export const App: React.FC = () => {
     init();
 
     // Test & automation hooks for Wayland MCP bridge
+    (window as any).__HENOSIS_STORE = useStore;
     (window as any).__NEXUS_STORE = useStore;
-    (window as any).__NEXUS_QUERY_STATE = () => {
+    const queryState = () => {
       const store = useStore.getState();
       const envEl = document.querySelector(".env-container") || document.querySelector(".console-environment");
       const coverflowItems = document.querySelectorAll(".coverflow-item");
@@ -62,14 +63,18 @@ export const App: React.FC = () => {
         focusedGameTitle: document.querySelector(".spotlight-panel-title")?.textContent || null,
       };
     };
+    (window as any).__HENOSIS_QUERY_STATE = queryState;
+    (window as any).__NEXUS_QUERY_STATE = queryState;
 
-    (window as any).__NEXUS_REPORT = () => {
-      const q = (window as any).__NEXUS_QUERY_STATE?.();
+    const reportState = () => {
+      const q = queryState();
       if (q) {
         invoke("report_test_state", { state: q }).catch(() => {});
       }
     };
-    (window as any).__NEXUS_REPORT();
+    (window as any).__HENOSIS_REPORT = reportState;
+    (window as any).__NEXUS_REPORT = reportState;
+    reportState();
 
     const unsubs = [
       listen<{ phase: string; count: number; current: string }>("scan-progress", (ev) => {
@@ -98,7 +103,7 @@ export const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    (window as any).__NEXUS_REPORT?.();
+    ((window as any).__HENOSIS_REPORT || (window as any).__NEXUS_REPORT)?.();
   }, [screen, running, toasts.length]);
 
   // Global fallback for Guide button when already focused
@@ -114,10 +119,10 @@ export const App: React.FC = () => {
   );
 
   return (
-    <div className="nexus-shell">
+    <div className="henosis-shell">
       <TopBar />
 
-      <div className="nexus-stage">
+      <div className="henosis-stage">
         {screen.kind === "home" && <HomeView />}
         {screen.kind === "platform" && <PlatformView platformId={screen.platformId} />}
         {screen.kind === "game" && (

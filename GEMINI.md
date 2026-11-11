@@ -57,15 +57,15 @@ The application contains an automation bridge and an MCP (Model Context Protocol
   - Embedded HTTP listener on `127.0.0.1:9998` inside the Tauri binary.
   - Dispatches simulated gamepad buttons (`POST /input`), evaluates JS (`POST /eval`), reports state (`GET /state`), and captures Wayland screenshots via KDE Spectacle (`POST /screenshot`).
 - **MCP Server ([`mcp-server/index.js`](file:///home/hyrox/Documents/Code/Gamemode/mcp-server/index.js)):**
-  - Registered globally in [`~/.gemini/config/mcp_config.json`](file:///home/hyrox/.gemini/config/mcp_config.json) under `nexus-wayland-tester`.
+  - Registered globally in [`~/.gemini/config/mcp_config.json`](file:///home/hyrox/.gemini/config/mcp_config.json) under `henosis-wayland-tester`.
   - Tools available:
-    - `nexus_status`: Health check on port 9998.
-    - `nexus_get_state`: Live snapshot of active screen, platform, theme class, and 3D transforms.
-    - `nexus_send_input`: Simulates pad buttons (`a`, `b`, `x`, `y`, `lb`, `rb`, `left`, `right`).
-    - `nexus_navigate`: Direct navigation to any screen.
-    - `nexus_eval_js`: Executes JS in WebKit context.
-    - `nexus_capture_screenshot`: Captures a Wayland PNG via `spectacle`.
-    - `nexus_run_all_tests`: Runs the 11-step automated feature test suite.
+    - `henosis_status`: Health check on port 9998.
+    - `henosis_get_state`: Live snapshot of active screen, platform, theme class, and 3D transforms.
+    - `henosis_send_input`: Simulates pad buttons (`a`, `b`, `x`, `y`, `lb`, `rb`, `left`, `right`).
+    - `henosis_navigate`: Direct navigation to any screen.
+    - `henosis_eval_js`: Executes JS in WebKit context.
+    - `henosis_capture_screenshot`: Captures a Wayland PNG via `spectacle`.
+    - `henosis_run_all_tests`: Runs the 11-step automated feature test suite.
 - **Run Tests Manually:**
   ```bash
   node mcp-server/test-runner.js

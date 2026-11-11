@@ -13,7 +13,7 @@ const list = typeof workspace.windowList === "function" ? workspace.windowList()
 for (let i = 0; i < list.length; i++) {
     const w = list[i];
     const cls = String(w.resourceClass || "").toLowerCase();
-    if (w.caption === "Henosis Launcher" || w.caption === "Nexus" || cls.indexOf("henosis") !== -1 || cls.indexOf("nexus") !== -1) {
+    if (w.caption === "Henosis Launcher" || cls.indexOf("henosis") !== -1) {
         w.minimized = false;
         if ("activeWindow" in workspace) { workspace.activeWindow = w; } else { workspace.activeClient = w; }
     }
@@ -64,7 +64,7 @@ fn kwin_activate(app: &AppHandle) {
     if std::fs::write(&script, KWIN_SCRIPT).is_err() {
         return;
     }
-    let name = "nexus-activate";
+    let name = "henosis-activate";
     let _ = Command::new(qdbus).args(["org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting.unloadScript", name]).output();
     let out = Command::new(qdbus)
         .args(["org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting.loadScript", &script.to_string_lossy(), name])

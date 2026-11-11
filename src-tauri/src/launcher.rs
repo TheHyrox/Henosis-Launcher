@@ -341,7 +341,7 @@ struct JournalEntry {
 
 fn backup_path(target: &Path) -> PathBuf {
     let mut s = target.as_os_str().to_owned();
-    s.push(".nexus-backup");
+    s.push(".henosis-backup");
     PathBuf::from(s)
 }
 

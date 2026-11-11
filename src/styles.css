@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   NEXUS LAUNCHER – Console-First Gaming OS Stylesheet
+   HENOSIS LAUNCHER – Console-First Gaming OS Stylesheet
    Inspired by Xbox Dashboard, Steam Big Picture, PlayStation 5, and physical media shelves.
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -61,7 +61,7 @@ code {
 
 /* ── Shell & Ambient Backdrop ────────────────────────────────────────────── */
 
-.nexus-shell {
+.henosis-shell {
   display: flex;
   flex-direction: column;
   width: 100vw;
@@ -69,7 +69,7 @@ code {
   position: relative;
 }
 
-.nexus-stage {
+.henosis-stage {
   flex: 1;
   position: relative;
   overflow: hidden;

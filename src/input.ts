@@ -77,6 +77,7 @@ const KEY_MAP: Record<string, PadButton> = {
 };
 
 export function initInputBus() {
+  (window as any).__HENOSIS_DISPATCH_PAD = dispatch;
   (window as any).__NEXUS_DISPATCH_PAD = dispatch;
   if (initialized) return;
   initialized = true;

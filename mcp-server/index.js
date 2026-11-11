@@ -47,12 +47,12 @@ function bridgeRequest(method, endpoint, data = null) {
     });
 
     req.on("error", (err) => {
-      reject(new Error(`Failed to connect to Nexus Launcher test bridge: ${err.message}`));
+      reject(new Error(`Failed to connect to Henosis Launcher test bridge: ${err.message}`));
     });
 
     req.on("timeout", () => {
       req.destroy();
-      reject(new Error("Timeout connecting to Nexus Launcher test bridge"));
+      reject(new Error("Timeout connecting to Henosis Launcher test bridge"));
     });
 
     if (postData) {
@@ -95,7 +95,7 @@ async function runAllFeatureTests() {
     );
 
     // 3. Test Navigation through Consoles (Left / Right)
-    await bridgeRequest("POST", "/eval", { script: "window.__NEXUS_STORE.getState().setHomeIndex(0);" });
+    await bridgeRequest("POST", "/eval", { script: "(window.__HENOSIS_STORE || window.__NEXUS_STORE).getState().setHomeIndex(0);" });
     await sleep(150);
     const initialIndex = 0;
     await bridgeRequest("POST", "/input", { button: "right" });
@@ -178,7 +178,7 @@ async function runAllFeatureTests() {
     );
 
     // 10. Test Bumper Return / B Button Back
-    await bridgeRequest("POST", "/eval", { script: "window.__NEXUS_STORE.getState().goHome();" });
+    await bridgeRequest("POST", "/eval", { script: "(window.__HENOSIS_STORE || window.__NEXUS_STORE).getState().goHome();" });
     await sleep(200);
     await bridgeRequest("POST", "/navigate", { screen: { kind: "platform", platformId: "steam" } });
     await sleep(300);
@@ -193,7 +193,7 @@ async function runAllFeatureTests() {
     );
 
     // 11. Test Wayland Screenshot Capture via Spectacle
-    const screenshotPath = "/tmp/nexus_wayland_test.png";
+    const screenshotPath = "/tmp/henosis_wayland_test.png";
     const shot = await bridgeRequest("POST", "/screenshot", { path: screenshotPath });
     const shotExists = fs.existsSync(screenshotPath) && fs.statSync(screenshotPath).size > 1000;
     record(
@@ -212,15 +212,15 @@ async function runAllFeatureTests() {
 // Tool Definitions for MCP
 const TOOLS = [
   {
-    name: "nexus_status",
-    description: "Check connection and health status of the running Nexus Launcher Wayland app.",
+    name: "henosis_status",
+    description: "Check connection and health status of the running Henosis Launcher Wayland app.",
     inputSchema: {
       type: "object",
       properties: {},
     },
   },
   {
-    name: "nexus_get_state",
+    name: "henosis_get_state",
     description: "Retrieve complete live UI and store state (current screen, active platform, theme classes, 3D transforms, focused title).",
     inputSchema: {
       type: "object",
@@ -228,7 +228,7 @@ const TOOLS = [
     },
   },
   {
-    name: "nexus_send_input",
+    name: "henosis_send_input",
     description: "Simulate a controller / gamepad button press (a, b, x, y, lb, rb, left, right, up, down, start, select, guide).",
     inputSchema: {
       type: "object",
@@ -242,7 +242,7 @@ const TOOLS = [
     },
   },
   {
-    name: "nexus_navigate",
+    name: "henosis_navigate",
     description: "Navigate directly to any application screen (home, platform, game, settings).",
     inputSchema: {
       type: "object",
@@ -256,8 +256,8 @@ const TOOLS = [
     },
   },
   {
-    name: "nexus_eval_js",
-    description: "Evaluate arbitrary JavaScript inside the Nexus Launcher WebKitGTK window.",
+    name: "henosis_eval_js",
+    description: "Evaluate arbitrary JavaScript inside the Henosis Launcher WebKitGTK window.",
     inputSchema: {
       type: "object",
       properties: {
@@ -270,20 +270,20 @@ const TOOLS = [
     },
   },
   {
-    name: "nexus_capture_screenshot",
+    name: "henosis_capture_screenshot",
     description: "Capture a screenshot of the running Wayland application using KDE Wayland spectacle.",
     inputSchema: {
       type: "object",
       properties: {
         path: {
           type: "string",
-          description: "Optional destination path for the PNG screenshot (defaults to /tmp/nexus_screenshot.png)",
+          description: "Optional destination path for the PNG screenshot (defaults to /tmp/henosis_screenshot.png)",
         },
       },
     },
   },
   {
-    name: "nexus_run_all_tests",
+    name: "henosis_run_all_tests",
     description: "Execute comprehensive automated feature tests covering all requirements (dynamic environments, 3D coverflow, navigation, input handling, screenshots) and return detailed pass/fail report.",
     inputSchema: {
       type: "object",
@@ -365,30 +365,30 @@ async function handleMessage(msg) {
     try {
       let resultText = "";
 
-      if (toolName === "nexus_status") {
+      if (toolName === "henosis_status" || toolName === "nexus_status") {
         const res = await bridgeRequest("GET", "/status");
         resultText = JSON.stringify(res, null, 2);
-      } else if (toolName === "nexus_get_state") {
+      } else if (toolName === "henosis_get_state" || toolName === "nexus_get_state") {
         const res = await bridgeRequest("GET", "/state");
         resultText = JSON.stringify(res, null, 2);
-      } else if (toolName === "nexus_send_input") {
+      } else if (toolName === "henosis_send_input" || toolName === "nexus_send_input") {
         const res = await bridgeRequest("POST", "/input", { button: args.button });
         resultText = JSON.stringify(res, null, 2);
-      } else if (toolName === "nexus_navigate") {
+      } else if (toolName === "henosis_navigate" || toolName === "nexus_navigate") {
         const res = await bridgeRequest("POST", "/navigate", { screen: args.screen });
         resultText = JSON.stringify(res, null, 2);
-      } else if (toolName === "nexus_eval_js") {
+      } else if (toolName === "henosis_eval_js" || toolName === "nexus_eval_js") {
         const res = await bridgeRequest("POST", "/eval", { script: args.script });
         resultText = JSON.stringify(res, null, 2);
-      } else if (toolName === "nexus_capture_screenshot") {
-        const res = await bridgeRequest("POST", "/screenshot", { path: args.path || "/tmp/nexus_screenshot.png" });
+      } else if (toolName === "henosis_capture_screenshot" || toolName === "nexus_capture_screenshot") {
+        const res = await bridgeRequest("POST", "/screenshot", { path: args.path || "/tmp/henosis_screenshot.png" });
         resultText = JSON.stringify(res, null, 2);
-      } else if (toolName === "nexus_run_all_tests") {
+      } else if (toolName === "henosis_run_all_tests" || toolName === "nexus_run_all_tests") {
         const results = await runAllFeatureTests();
         const total = results.length;
         const passed = results.filter((r) => r.pass).length;
         const failed = total - passed;
-        const header = `=== Nexus Launcher Wayland Test Suite ===\nTotal: ${total} | Passed: ${passed} | Failed: ${failed}\n\n`;
+        const header = `=== Henosis Launcher Wayland Test Suite ===\nTotal: ${total} | Passed: ${passed} | Failed: ${failed}\n\n`;
         const details = results
           .map((r) => `[${r.pass ? "PASS" : "FAIL"}] ${r.name}\n  └─ ${r.details}`)
           .join("\n\n");

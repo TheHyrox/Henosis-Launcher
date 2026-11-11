@@ -1,6 +1,6 @@
 //! Test bridge HTTP server on 127.0.0.1:9998
 //! Allows external MCP servers, testing harnesses, and Wayland automation to interact
-//! with the running Nexus Launcher window, send inputs, query state, and capture screenshots.
+//! with the running Henosis Launcher window, send inputs, query state, and capture screenshots.
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -115,7 +115,7 @@ fn handle_connection(mut stream: TcpStream, app: AppHandle) {
         }
         ("GET", "/state") => {
             if let Some(win) = app.get_webview_window("main") {
-                let _ = win.eval("if (window.__NEXUS_REPORT) { window.__NEXUS_REPORT(); }");
+                let _ = win.eval("if (window.__HENOSIS_REPORT) { window.__HENOSIS_REPORT(); } else if (window.__NEXUS_REPORT) { window.__NEXUS_REPORT(); }");
                 thread::sleep(Duration::from_millis(50));
             }
             let state = LATEST_STATE.lock().clone();
@@ -152,7 +152,7 @@ fn handle_connection(mut stream: TcpStream, app: AppHandle) {
         ("POST", "/input") => {
             let json: serde_json::Value = serde_json::from_str(&body_str).unwrap_or_default();
             let button = json["button"].as_str().unwrap_or("a");
-            let js = format!("if (window.__NEXUS_DISPATCH_PAD) {{ window.__NEXUS_DISPATCH_PAD('{}', false); }}", button);
+            let js = format!("if (window.__HENOSIS_DISPATCH_PAD) {{ window.__HENOSIS_DISPATCH_PAD('{}', false); }} else if (window.__NEXUS_DISPATCH_PAD) {{ window.__NEXUS_DISPATCH_PAD('{}', false); }}", button, button);
             if let Some(win) = app.get_webview_window("main") {
                 let _ = win.eval(&js);
                 (
@@ -171,7 +171,7 @@ fn handle_connection(mut stream: TcpStream, app: AppHandle) {
         ("POST", "/navigate") => {
             let json: serde_json::Value = serde_json::from_str(&body_str).unwrap_or_default();
             let screen_arg = json["screen"].to_string();
-            let js = format!("if (window.__NEXUS_STORE) {{ window.__NEXUS_STORE.getState().navigate({}); }}", screen_arg);
+            let js = format!("if (window.__HENOSIS_STORE) {{ window.__HENOSIS_STORE.getState().navigate({}); }} else if (window.__NEXUS_STORE) {{ window.__NEXUS_STORE.getState().navigate({}); }}", screen_arg, screen_arg);
             if let Some(win) = app.get_webview_window("main") {
                 let _ = win.eval(&js);
                 (
@@ -192,7 +192,7 @@ fn handle_connection(mut stream: TcpStream, app: AppHandle) {
             let target_path = json["path"]
                 .as_str()
                 .map(PathBuf::from)
-                .unwrap_or_else(|| PathBuf::from("/tmp/nexus_screenshot.png"));
+                .unwrap_or_else(|| PathBuf::from("/tmp/henosis_screenshot.png"));
 
             let res = Command::new("spectacle")
                 .arg("-b")
