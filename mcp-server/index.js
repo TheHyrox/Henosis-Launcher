@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 /**
- * Nexus Launcher Wayland MCP Server
+ * Henosis Launcher Wayland MCP Server
  *
  * Exposes Model Context Protocol (MCP) tools for connecting to, inspecting,
- * driving, and testing the Nexus Launcher Wayland application.
+ * driving, and testing the Henosis Launcher Wayland application.
  *
  * Implements JSON-RPC 2.0 over standard I/O (stdio).
  */
@@ -334,7 +334,7 @@ async function handleMessage(msg) {
           tools: {},
         },
         serverInfo: {
-          name: "nexus-wayland-tester",
+          name: "henosis-wayland-tester",
           version: "0.1.0",
         },
       },

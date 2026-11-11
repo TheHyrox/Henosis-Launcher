@@ -354,7 +354,7 @@ export const SettingsView: React.FC<{ initialSection?: SectionId }> = ({
                 <div>
                   <h3>Installed Emulators ({emulators.length})</h3>
                   <p>
-                    Nexus acts as a frontend for your standalone emulators (System binaries, Flatpaks, and AppImages) as well as RetroArch cores.
+                    Henosis acts as a frontend for your standalone emulators (System binaries, Flatpaks, and AppImages) as well as RetroArch cores.
                   </p>
                 </div>
                 <div className="head-actions">
@@ -529,7 +529,7 @@ export const SettingsView: React.FC<{ initialSection?: SectionId }> = ({
                   <div>
                     <strong>Summon Launcher with Xbox Guide Button</strong>
                     <p>
-                      Pressing the Xbox button on your controller brings Nexus to the front from anywhere on your desktop (using a KWin focus bridge on KDE Wayland).
+                      Pressing the Xbox button on your controller brings Henosis to the front from anywhere on your desktop (using a KWin focus bridge on KDE Wayland).
                     </p>
                   </div>
                   <button
@@ -549,7 +549,7 @@ export const SettingsView: React.FC<{ initialSection?: SectionId }> = ({
                   <div>
                     <strong>Hide Launcher While a Game Is Running</strong>
                     <p>
-                      Automatically hides the Nexus window on launch and restores focus as soon as you exit the game.
+                      Automatically hides the Henosis window on launch and restores focus as soon as you exit the game.
                     </p>
                   </div>
                   <button
@@ -585,9 +585,9 @@ export const SettingsView: React.FC<{ initialSection?: SectionId }> = ({
 
                 <div className="sys-row">
                   <div>
-                    <strong>Start Nexus at Login (Background Service)</strong>
+                    <strong>Start Henosis at Login (Background Service)</strong>
                     <p>
-                      Writes an XDG autostart entry (<code>~/.config/autostart/nexus-launcher.desktop</code>) so the Xbox button works immediately after booting.
+                      Writes an XDG autostart entry (<code>~/.config/autostart/henosis-launcher.desktop</code>) so the Xbox button works immediately after booting.
                     </p>
                   </div>
                   <button

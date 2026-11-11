@@ -37,7 +37,7 @@ export const TopBar: React.FC = () => {
       <div className="topbar-left">
         <button className="brand-pill" onClick={goHome} title="Home">
           <span className="brand-glyph">◆</span>
-          <span className="brand-name">NEXUS</span>
+          <span className="brand-name">HENOSIS</span>
         </button>
 
         <nav className="topbar-nav">

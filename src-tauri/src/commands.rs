@@ -435,14 +435,14 @@ pub fn save_app_settings(state: State<AppState>, settings: AppSettings) -> R<()>
 
 fn set_autostart(enabled: bool) -> std::io::Result<()> {
     let Some(cfg) = dirs::config_dir() else { return Ok(()) };
-    let file = cfg.join("autostart/nexus-launcher.desktop");
+    let file = cfg.join("autostart/henosis-launcher.desktop");
     if enabled {
         std::fs::create_dir_all(file.parent().unwrap())?;
         let exe = std::env::current_exe()?;
         std::fs::write(
             &file,
             format!(
-                "[Desktop Entry]\nType=Application\nName=Nexus Launcher\nExec=\"{}\" --background\nX-GNOME-Autostart-enabled=true\nNoDisplay=true\n",
+                "[Desktop Entry]\nType=Application\nName=Henosis Launcher\nExec=\"{}\" --background\nX-GNOME-Autostart-enabled=true\nNoDisplay=true\n",
                 exe.display()
             ),
         )?;

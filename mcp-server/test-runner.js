@@ -56,7 +56,7 @@ function sleep(ms) {
 
 async function main() {
   console.log("\x1b[1m\x1b[36m============================================================\x1b[0m");
-  console.log("\x1b[1m\x1b[36m  Nexus Launcher: Wayland Automated Feature Test Suite      \x1b[0m");
+  console.log("\x1b[1m\x1b[36m  Henosis Launcher: Wayland Automated Feature Test Suite    \x1b[0m");
   console.log("\x1b[1m\x1b[36m============================================================\x1b[0m\n");
 
   const results = [];

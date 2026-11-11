@@ -1,4 +1,4 @@
-# Nexus Gaming Launcher — Architecture & Project Guide
+# Henosis Gaming Launcher — Architecture & Project Guide
 
 Universal controller-first PC gaming hub running on Linux (CachyOS / KDE Wayland), merging modern Steam gaming with physical 3D console collectibles across 42 gaming platforms.
 

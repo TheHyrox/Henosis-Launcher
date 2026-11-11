@@ -1,4 +1,4 @@
-//! Nexus Launcher – Rust backend entry point.
+//! Henosis Launcher – Rust backend entry point.
 
 pub mod commands;
 pub mod db;
@@ -61,24 +61,32 @@ fn bootstrap(db: &Db) {
 pub fn run() {
     let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).try_init();
 
-    let data_dir = if let Ok(d) = std::env::var("NEXUS_DATA_DIR") {
+    let data_dir = if let Ok(d) = std::env::var("HENOSIS_DATA_DIR").or_else(|_| std::env::var("NEXUS_DATA_DIR")) {
         PathBuf::from(d)
     } else if let Some(local) = dirs::data_local_dir() {
-        let p = local.join("nexus-launcher");
+        let p = local.join("henosis-launcher");
         if std::fs::create_dir_all(&p).is_ok() {
             p
         } else {
-            PathBuf::from("/tmp/nexus-launcher")
+            PathBuf::from("/tmp/henosis-launcher")
         }
     } else {
-        PathBuf::from("/tmp/nexus-launcher")
+        PathBuf::from("/tmp/henosis-launcher")
     };
     let _ = std::fs::create_dir_all(&data_dir);
 
     // Crash recovery for any per-game config overrides left over from an interrupted session.
     launcher::restore_overrides(&data_dir.join("restore-journal.json"));
 
-    let db = Db::open(&data_dir.join("nexus.sqlite")).expect("open database");
+    // Check for existing database (migrate from legacy nexus.sqlite if present)
+    let db_path = if data_dir.join("henosis.sqlite").exists() {
+        data_dir.join("henosis.sqlite")
+    } else if data_dir.join("nexus.sqlite").exists() {
+        data_dir.join("nexus.sqlite")
+    } else {
+        data_dir.join("henosis.sqlite")
+    };
+    let db = Db::open(&db_path).expect("open database");
     let _ = db.purge_missing();
     bootstrap(&db);
     let settings = db.app_settings();
@@ -182,5 +190,5 @@ pub fn run() {
             commands::report_test_state,
         ])
         .run(tauri::generate_context!())
-        .expect("error running nexus launcher");
+        .expect("error running henosis launcher");
 }

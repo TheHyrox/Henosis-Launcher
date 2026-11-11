@@ -72,7 +72,7 @@ export const QuickMenuModal: React.FC = () => {
       },
     },
     {
-      label: "Quit Nexus Launcher",
+      label: "Quit Henosis Launcher",
       sub: "Exit the application completely",
       danger: true,
       run: () => {
@@ -109,7 +109,7 @@ export const QuickMenuModal: React.FC = () => {
     <div className="modal-backdrop" onClick={() => setQuickMenu(false)}>
       <div className="quick-modal" onClick={(e) => e.stopPropagation()}>
         <div className="quick-header">
-          <span className="quick-badge">❖ NEXUS GUIDE</span>
+          <span className="quick-badge">❖ HENOSIS GUIDE</span>
           <h3>Quick Menu</h3>
         </div>
         <div className="quick-list">

@@ -1,11 +1,11 @@
 [package]
-name = "nexus-launcher"
+name = "henosis-launcher"
 version = "0.1.0"
 edition = "2021"
 description = "Controller-first universal gaming launcher"
 
 [lib]
-name = "nexus_lib"
+name = "henosis_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

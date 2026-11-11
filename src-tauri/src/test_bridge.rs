@@ -98,7 +98,7 @@ fn handle_connection(mut stream: TcpStream, app: AppHandle) {
             "application/json",
             serde_json::json!({
                 "ok": true,
-                "name": "nexus-launcher",
+                "name": "henosis-launcher",
                 "version": "0.1.0",
                 "environment": "wayland"
             })

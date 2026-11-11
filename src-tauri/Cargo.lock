@@ -1569,6 +1569,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
+name = "henosis-launcher"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "dirs",
+ "env_logger",
+ "gilrs",
+ "log",
+ "parking_lot 0.13.0",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-single-instance",
+ "walkdir",
+]
+
+[[package]]
 name = "hermit-abi"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2310,25 +2329,6 @@ name = "new_debug_unreachable"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
-
-[[package]]
-name = "nexus-launcher"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "dirs",
- "env_logger",
- "gilrs",
- "log",
- "parking_lot 0.13.0",
- "rusqlite",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-single-instance",
- "walkdir",
-]
 
 [[package]]
 name = "nix"

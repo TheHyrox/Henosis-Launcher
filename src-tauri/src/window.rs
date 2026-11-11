@@ -13,7 +13,7 @@ const list = typeof workspace.windowList === "function" ? workspace.windowList()
 for (let i = 0; i < list.length; i++) {
     const w = list[i];
     const cls = String(w.resourceClass || "").toLowerCase();
-    if (w.caption === "Nexus" || cls.indexOf("nexus") !== -1) {
+    if (w.caption === "Henosis Launcher" || w.caption === "Nexus" || cls.indexOf("henosis") !== -1 || cls.indexOf("nexus") !== -1) {
         w.minimized = false;
         if ("activeWindow" in workspace) { workspace.activeWindow = w; } else { workspace.activeClient = w; }
     }
