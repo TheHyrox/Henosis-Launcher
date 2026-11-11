@@ -11,16 +11,13 @@ echo "=========================================="
 echo " [Nexus] Building and Reloading Launcher  "
 echo "=========================================="
 
-echo "==> 1. Compiling frontend assets (Vite)..."
-npm run build
+echo "==> 1. Compiling production bundle (Tauri + Vite)..."
+npx tauri build --no-bundle
 
-echo "==> 2. Compiling Rust release binary..."
-cargo build --release --manifest-path src-tauri/Cargo.toml
-
-echo "==> 3. Reloading systemd user daemon..."
+echo "==> 2. Reloading systemd user daemon..."
 systemctl --user daemon-reload
 
-echo "==> 4. Restarting nexus.service..."
+echo "==> 3. Restarting nexus.service..."
 systemctl --user restart nexus.service
 
 echo "=========================================="
