@@ -5,6 +5,7 @@
 // global bindings handle it.
 
 import { useEffect, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { PadButton, PadEvent } from "./api";
 import { sfx } from "./sound";
@@ -24,10 +25,32 @@ let initialized = false;
 const padListeners = new Set<(info: { connected: boolean; name: string }) => void>();
 let lastPad: { connected: boolean; name: string } = { connected: false, name: "" };
 let lastInputType: "controller" | "mouse" | "keyboard" = "keyboard";
+let lastMousePos: { x: number; y: number } | null = null;
+let idleCursorTimer: number | null = null;
+
+function clearIdleCursorTimer() {
+  if (idleCursorTimer !== null) {
+    window.clearTimeout(idleCursorTimer);
+    idleCursorTimer = null;
+  }
+}
+
+function scheduleIdleCursorHide() {
+  clearIdleCursorTimer();
+  if (!lastPad.connected || lastInputType !== "mouse") return;
+  idleCursorTimer = window.setTimeout(() => {
+    idleCursorTimer = null;
+    if (lastPad.connected) {
+      lastInputType = "controller";
+      updateCursorVisibility();
+    }
+  }, 2500);
+}
 
 function updateCursorVisibility() {
   const isControllerActive = lastPad.connected && lastInputType === "controller";
   if (isControllerActive) {
+    clearIdleCursorTimer();
     document.documentElement.classList.add("controller-mode");
   } else {
     document.documentElement.classList.remove("controller-mode");
@@ -198,7 +221,19 @@ export function initInputBus() {
   if (initialized) return;
   initialized = true;
 
+  invoke<{ connected: boolean; name: string }>("get_pad_status")
+    .then((info) => {
+      if (info && info.connected) {
+        lastPad = info;
+        lastInputType = "controller";
+        updateCursorVisibility();
+        padListeners.forEach((cb) => cb(lastPad));
+      }
+    })
+    .catch(() => {});
+
   listen<PadEvent>("pad", (ev) => {
+    lastPad.connected = true;
     lastInputType = "controller";
     updateCursorVisibility();
     handlePressWithArbitration(ev.payload.button, ev.payload.repeat);
@@ -217,32 +252,49 @@ export function initInputBus() {
     padListeners.forEach((cb) => cb(lastPad));
   }).catch(() => {});
 
+  listen("launcher-shown", () => {
+    lastMousePos = null;
+    if (lastPad.connected) {
+      lastInputType = "controller";
+      updateCursorVisibility();
+    }
+  }).catch(() => {});
+
   window.addEventListener(
     "pointermove",
     (e) => {
-      // Ignore simulated or zero-movement events
-      if (e.movementX === 0 && e.movementY === 0) return;
+      if (lastMousePos === null) {
+        lastMousePos = { x: e.clientX, y: e.clientY };
+        return;
+      }
+      const dx = e.clientX - lastMousePos.x;
+      const dy = e.clientY - lastMousePos.y;
+      if (dx * dx + dy * dy <= 36) return;
+      lastMousePos = { x: e.clientX, y: e.clientY };
       if (lastInputType !== "mouse") {
         lastInputType = "mouse";
         updateCursorVisibility();
       }
+      scheduleIdleCursorHide();
     },
     { passive: true }
   );
 
   window.addEventListener(
     "pointerdown",
-    () => {
+    (e) => {
+      lastMousePos = { x: e.clientX, y: e.clientY };
       if (lastInputType !== "mouse") {
         lastInputType = "mouse";
         updateCursorVisibility();
       }
+      scheduleIdleCursorHide();
     },
     { passive: true }
   );
 
   window.addEventListener("keydown", (e) => {
-    if (lastInputType !== "keyboard") {
+    if (!lastPad.connected && lastInputType !== "keyboard") {
       lastInputType = "keyboard";
       updateCursorVisibility();
     }

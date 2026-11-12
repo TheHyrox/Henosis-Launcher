@@ -571,7 +571,13 @@ pub fn hide_window(app: AppHandle) {
 
 #[tauri::command]
 pub fn quit_app(app: AppHandle) {
+    launcher::resume_running(&app);
     app.exit(0);
+}
+
+#[tauri::command]
+pub fn get_pad_status(state: State<AppState>) -> crate::gamepad::PadInfo {
+    state.pad_info.lock().clone()
 }
 
 #[tauri::command]

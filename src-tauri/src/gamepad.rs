@@ -83,8 +83,10 @@ fn run(app: AppHandle) {
         }
     };
     for (_, pad) in gilrs.gamepads() {
-        log::info!("Gamepad: {}", pad.name());
-        let _ = app.emit("pad-connection", PadInfo { connected: true, name: pad.name().to_string() });
+        let info = PadInfo { connected: true, name: pad.name().to_string() };
+        log::info!("Gamepad: {}", info.name);
+        *app.state::<AppState>().pad_info.lock() = info.clone();
+        let _ = app.emit("pad-connection", info);
     }
 
     let mut held: HashMap<&'static str, Held> = HashMap::new();
@@ -97,12 +99,18 @@ fn run(app: AppHandle) {
             let state = app.state::<AppState>();
             match ev.event {
                 EventType::Connected => {
-                    let name = gilrs.gamepad(ev.id).name().to_string();
-                    let _ = app.emit("pad-connection", PadInfo { connected: true, name });
+                    let info = PadInfo { connected: true, name: gilrs.gamepad(ev.id).name().to_string() };
+                    *state.pad_info.lock() = info.clone();
+                    let _ = app.emit("pad-connection", info);
                 }
                 EventType::Disconnected => {
-                    let name = gilrs.gamepad(ev.id).name().to_string();
-                    let _ = app.emit("pad-connection", PadInfo { connected: false, name });
+                    let any_connected = gilrs.gamepads().find(|(_, p)| p.is_connected());
+                    let info = match any_connected {
+                        Some((_, p)) => PadInfo { connected: true, name: p.name().to_string() },
+                        None => PadInfo { connected: false, name: gilrs.gamepad(ev.id).name().to_string() },
+                    };
+                    *state.pad_info.lock() = info.clone();
+                    let _ = app.emit("pad-connection", info);
                 }
                 EventType::ButtonPressed(b, _) => {
                     let Some(name) = map_button(b) else { continue };

@@ -32,6 +32,7 @@ pub struct AppState {
     pub visible: AtomicBool,
     pub focused: AtomicBool,
     pub guide_enabled: AtomicBool,
+    pub pad_info: Mutex<gamepad::PadInfo>,
     pub data_dir: PathBuf,
 }
 
@@ -95,6 +96,7 @@ pub fn run() {
         visible: AtomicBool::new(!start_hidden),
         focused: AtomicBool::new(!start_hidden),
         guide_enabled: AtomicBool::new(settings.guide_summons),
+        pad_info: Mutex::new(gamepad::PadInfo { connected: false, name: String::new() }),
         data_dir,
     };
 
@@ -191,6 +193,7 @@ pub fn run() {
             commands::save_app_settings,
             commands::hide_window,
             commands::quit_app,
+            commands::get_pad_status,
             commands::report_test_state,
         ])
         .run(tauri::generate_context!())

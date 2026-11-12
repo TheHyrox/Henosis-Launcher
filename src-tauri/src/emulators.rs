@@ -707,6 +707,11 @@ pub fn build_command(emu: &Emulator, ctx: &BuildContext) -> Result<CommandSpec, 
             }
         }
         "azahar" | "lime3ds" => {
+            // Qt6 Wayland explicit-sync (wp_linux_drm_syncobj_surface_v1) crashes when
+            // Azahar recreates/destroys surfaces during layout cycling; XWayland avoids it.
+            if std::env::var_os("WAYLAND_DISPLAY").is_some() && std::env::var_os("QT_QPA_PLATFORM").is_none() {
+                env.push(("QT_QPA_PLATFORM".into(), "xcb".into()));
+            }
             if fullscreen {
                 settings_args.push("-f".into());
             } else {
@@ -769,6 +774,11 @@ pub fn build_command(emu: &Emulator, ctx: &BuildContext) -> Result<CommandSpec, 
                 let config_base = home.join(format!(".config/{emu_name}"));
                 let mut updates = Vec::new();
 
+                if s.screen_layout.as_deref() != Some("separate") {
+                    // Exclude "4" (Separate Windows) & "6" (Custom) from R3 cycling in fullscreen.
+                    updates.push(("Layout", "layouts_to_cycle", "0, 1, 2, 3, 5"));
+                    updates.push(("Layout", "layouts_to_cycle\\default", "false"));
+                }
                 if let Some(layout) = s.screen_layout.as_deref() {
                     let opt = match layout {
                         "top-bottom" => "0",

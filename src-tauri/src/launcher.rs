@@ -34,6 +34,8 @@ pub struct RunningGame {
     pub steam_app_id: Option<u32>,
     #[serde(skip)]
     pub stop: Arc<AtomicBool>,
+    #[serde(skip)]
+    pub paused: Arc<AtomicBool>,
 }
 
 fn emit_session_state(app: &AppHandle, state: &AppState, status: &str, status_message: Option<String>) {
@@ -226,6 +228,7 @@ pub fn launch(app: &AppHandle, game_id: i64) -> Result<(), String> {
         pgid: (!is_steam).then_some(child.id()),
         steam_app_id: game.steam_app_id,
         stop: stop.clone(),
+        paused: Arc::new(AtomicBool::new(false)),
     };
     *state.running.lock() = Some(running.clone());
     let _ = app.emit("game-started", &running);
@@ -406,24 +409,69 @@ pub fn steam_pids(appid: u32) -> Vec<u32> {
     pids
 }
 
+fn running_targets(running: &RunningGame) -> Vec<String> {
+    match (running.pgid, running.steam_app_id) {
+        (Some(pg), _) => vec![format!("-{pg}")],
+        (None, Some(app)) => steam_pids(app).into_iter().map(|p| p.to_string()).collect(),
+        _ => vec![],
+    }
+}
+
+fn send_signal(sig: &str, targets: &[String]) {
+    if !targets.is_empty() {
+        let _ = Command::new("kill").arg(sig).arg("--").args(targets).status();
+    }
+}
+
+/// Pause the running game/emulator (SIGSTOP) when Henosis is summoned to the foreground,
+/// so controller navigation in Henosis never leaks into the game.
+pub fn pause_running(app: &AppHandle) {
+    let Some(state) = app.try_state::<AppState>() else { return };
+    let target = {
+        let guard = state.running.lock();
+        guard.as_ref().and_then(|r| {
+            if r.status == "RUNNING" && !r.paused.swap(true, Ordering::SeqCst) {
+                Some(running_targets(r))
+            } else {
+                None
+            }
+        })
+    };
+    if let Some(targets) = target {
+        send_signal("-STOP", &targets);
+    }
+}
+
+/// Resume a paused game/emulator (SIGCONT) when returning to it.
+pub fn resume_running(app: &AppHandle) {
+    let Some(state) = app.try_state::<AppState>() else { return };
+    let target = {
+        let guard = state.running.lock();
+        guard.as_ref().and_then(|r| {
+            if r.paused.swap(false, Ordering::SeqCst) {
+                Some(running_targets(r))
+            } else {
+                None
+            }
+        })
+    };
+    if let Some(targets) = target {
+        send_signal("-CONT", &targets);
+    }
+}
+
 pub fn stop(app: &AppHandle, state: &AppState) -> Result<(), String> {
     let running = state.running.lock().clone().ok_or("No game running")?;
     running.stop.store(true, Ordering::Relaxed);
     emit_session_state(app, state, "STOPPING", Some("Closing session & flushing saves…".to_string()));
-    let signal = |sig: &str, targets: Vec<String>| {
-        if !targets.is_empty() {
-            let _ = Command::new("kill").arg(sig).arg("--").args(targets).status();
-        }
-    };
-    let targets: Vec<String> = match (running.pgid, running.steam_app_id) {
-        (Some(pg), _) => vec![format!("-{pg}")],
-        (None, Some(app)) => steam_pids(app).into_iter().map(|p| p.to_string()).collect(),
-        _ => vec![],
-    };
-    signal("-TERM", targets.clone());
+    let targets = running_targets(&running);
+    if running.paused.swap(false, Ordering::SeqCst) {
+        send_signal("-CONT", &targets);
+    }
+    send_signal("-TERM", &targets);
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_millis(2500));
-        signal("-KILL", targets);
+        send_signal("-KILL", &targets);
     });
     Ok(())
 }

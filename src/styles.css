@@ -61,7 +61,8 @@ html.controller-mode * {
   cursor: none !important;
 }
 
-html.controller-mode .henosis-shell {
+html.controller-mode .henosis-shell,
+html.controller-mode .henosis-shell * {
   pointer-events: none !important;
 }
 

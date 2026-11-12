@@ -21,6 +21,7 @@ for (let i = 0; i < list.length; i++) {
 "#;
 
 pub fn show(app: &AppHandle) {
+    crate::launcher::pause_running(app);
     let Some(w) = app.get_webview_window("main") else { return };
     let _ = w.unminimize();
     let _ = w.show();
@@ -50,6 +51,7 @@ pub fn hide(app: &AppHandle) {
         state.visible.store(false, Ordering::Relaxed);
         state.focused.store(false, Ordering::Relaxed);
     }
+    crate::launcher::resume_running(app);
 }
 
 /// Activate the launcher window through a short-lived KWin script (KDE Plasma only).
