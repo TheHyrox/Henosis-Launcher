@@ -6,7 +6,7 @@
 // - Glass / metallic floor surface with inverted mirror reflections and ambient spotlights
 // - Molded 3D retro cartridges with top finger grips, label stickers, and gold connector pins
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ArtStyle, Game, mediaSrc, Platform } from "../api";
 
 export interface CollectibleProps {
@@ -194,12 +194,85 @@ function initials(title: string): string {
 
 /** Artwork printed directly onto the cover insert or cartridge label */
 const CaseArtwork: React.FC<{ game: Game; platform: Platform }> = ({ game, platform }) => {
-  const [broken, setBroken] = useState(false);
+  const [stage, setStage] = useState<"cover" | "steam_cdn" | "header" | "hero" | "failed">("cover");
   const [logoBroken, setLogoBroken] = useState(false);
 
-  const artUrl = !broken
-    ? mediaSrc(game.cover) || mediaSrc(game.metadata?.header) || mediaSrc(game.hero)
+  const steamCdn = game.steamAppId
+    ? `https://shared.steamstatic.com/store_item_assets/steam/apps/${game.steamAppId}/library_600x900.jpg`
     : null;
+
+  useEffect(() => {
+    setStage("cover");
+    setLogoBroken(false);
+  }, [game.id, game.cover, game.hero, game.logo]);
+
+  const rawCover = mediaSrc(game.cover);
+  let artUrl: string | null = null;
+  let isCoverArt = false;
+
+  if (stage === "cover") {
+    if (rawCover) {
+      artUrl = rawCover;
+      isCoverArt = true;
+    } else if (steamCdn) {
+      artUrl = steamCdn;
+      isCoverArt = true;
+    } else if (game.metadata?.header) {
+      artUrl = mediaSrc(game.metadata.header);
+    } else if (game.hero) {
+      artUrl = mediaSrc(game.hero);
+    }
+  } else if (stage === "steam_cdn") {
+    if (steamCdn && rawCover !== steamCdn) {
+      artUrl = steamCdn;
+      isCoverArt = true;
+    } else if (game.metadata?.header) {
+      artUrl = mediaSrc(game.metadata.header);
+    } else if (game.hero) {
+      artUrl = mediaSrc(game.hero);
+    }
+  } else if (stage === "header") {
+    if (game.metadata?.header) {
+      artUrl = mediaSrc(game.metadata.header);
+    } else if (game.hero) {
+      artUrl = mediaSrc(game.hero);
+    }
+  } else if (stage === "hero") {
+    if (game.hero) {
+      artUrl = mediaSrc(game.hero);
+    }
+  }
+
+  const handleImgError = () => {
+    if (stage === "cover") {
+      if (steamCdn && rawCover !== steamCdn) {
+        setStage("steam_cdn");
+      } else if (game.metadata?.header) {
+        setStage("header");
+      } else if (game.hero) {
+        setStage("hero");
+      } else {
+        setStage("failed");
+      }
+    } else if (stage === "steam_cdn") {
+      if (game.metadata?.header) {
+        setStage("header");
+      } else if (game.hero) {
+        setStage("hero");
+      } else {
+        setStage("failed");
+      }
+    } else if (stage === "header") {
+      if (game.hero) {
+        setStage("hero");
+      } else {
+        setStage("failed");
+      }
+    } else {
+      setStage("failed");
+    }
+  };
+
   const logoUrl = !logoBroken ? mediaSrc(game.logo) : null;
 
   return (
@@ -209,14 +282,14 @@ const CaseArtwork: React.FC<{ game: Game; platform: Platform }> = ({ game, platf
         background: `linear-gradient(150deg, ${platform.color} 0%, #080c16 65%, ${platform.accent}44 100%)`,
       }}
     >
-      {artUrl ? (
+      {artUrl && stage !== "failed" ? (
         <img
           src={artUrl}
           alt={game.title}
           className="case-art-img"
           loading="lazy"
           decoding="async"
-          onError={() => setBroken(true)}
+          onError={handleImgError}
         />
       ) : (
         <div className="case-art-fallback">
@@ -228,7 +301,8 @@ const CaseArtwork: React.FC<{ game: Game; platform: Platform }> = ({ game, platf
         </div>
       )}
 
-      {logoUrl && (
+      {/* Show floating logo ONLY when falling back to a hero/header banner without cover art */}
+      {!isCoverArt && logoUrl && (
         <div className="case-logo-overlay">
           <img src={logoUrl} alt="" onError={() => setLogoBroken(true)} />
         </div>

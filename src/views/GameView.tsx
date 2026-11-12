@@ -1095,7 +1095,12 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
   if (!game || !platform) return null;
 
   const heroSrc =
-    mediaSrc(game.hero) || mediaSrc(game.metadata?.header) || mediaSrc(game.cover);
+    mediaSrc(game.hero) ||
+    mediaSrc(game.metadata?.header) ||
+    mediaSrc(game.cover) ||
+    (game.steamAppId
+      ? `https://shared.steamstatic.com/store_item_assets/steam/apps/${game.steamAppId}/library_hero.jpg`
+      : null);
   const curScale = game.settings?.resolutionScale || 1;
   const curAspect = game.settings?.aspectRatio || "4:3";
   const curShader = game.settings?.scalingFilter || "nearest";

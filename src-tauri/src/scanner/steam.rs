@@ -94,7 +94,7 @@ pub fn scan(custom_root: Option<&str>) -> Vec<ScannedGame> {
                 path: format!("steam://rungameid/{appid}"),
                 source: "steam".into(),
                 steam_app_id: Some(appid),
-                cover: art.cover.or_else(|| Some(cdn(appid, "library_600x900_2x.jpg"))),
+                cover: art.cover.or_else(|| Some(cdn(appid, "library_600x900.jpg"))),
                 hero: art.hero.or_else(|| Some(cdn(appid, "library_hero.jpg"))),
                 logo: art.logo.or_else(|| Some(cdn(appid, "logo.png"))),
                 file_size: size,
@@ -110,7 +110,7 @@ pub fn scan(custom_root: Option<&str>) -> Vec<ScannedGame> {
 }
 
 fn cdn(appid: u32, file: &str) -> String {
-    format!("https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/{appid}/{file}")
+    format!("https://shared.steamstatic.com/store_item_assets/steam/apps/{appid}/{file}")
 }
 
 #[derive(Default)]
@@ -133,7 +133,14 @@ fn find_art(cache: &Path, appid: u32) -> Art {
             }
         }
     }
-    for suffix in ["library_600x900.jpg", "library_hero.jpg", "logo.png", "header.jpg"] {
+    for suffix in [
+        "library_600x900.jpg",
+        "library_600x900_2x.jpg",
+        "library_capsule.jpg",
+        "library_hero.jpg",
+        "logo.png",
+        "header.jpg",
+    ] {
         let flat = cache.join(format!("{appid}_{suffix}"));
         if flat.is_file() {
             files.push(flat);

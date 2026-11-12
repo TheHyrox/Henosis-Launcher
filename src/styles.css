@@ -3333,9 +3333,15 @@ code {
 }
 .case-type-pc .case-top-banner {
   background: linear-gradient(90deg, #1b2838, #2a475e);
+  height: 20px;
+  font-size: 0.54rem;
 }
 .case-type-pc .case-face-spine {
   background: #17212e;
+}
+.case-type-pc .case-art-img {
+  object-fit: cover;
+  object-position: center 20%;
 }
 
 /* 3D Molded Cartridge Construction (NES / SNES / N64 / Game Boy / GBA / Sega) */

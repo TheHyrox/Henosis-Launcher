@@ -763,7 +763,7 @@ fn fetch_steam_appdetails(appid: u32) -> Option<MetadataCandidate> {
                 .map(|s| s.to_string())
         });
     let cover = Some(format!(
-        "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/{appid}/library_600x900.jpg"
+        "https://shared.steamstatic.com/store_item_assets/steam/apps/{appid}/library_600x900.jpg"
     ));
 
     Some(MetadataCandidate {
@@ -795,10 +795,10 @@ fn search_steam_candidates(query: &str, limit: usize) -> Vec<MetadataCandidate> 
         let Some(appid) = item.get("id").and_then(|v| v.as_u64()).map(|n| n as u32) else { continue };
         let Some(name) = item.get("name").and_then(|v| v.as_str()) else { continue };
         let cover = format!(
-            "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/{appid}/library_600x900.jpg"
+            "https://shared.steamstatic.com/store_item_assets/steam/apps/{appid}/library_600x900.jpg"
         );
         let hero = format!(
-            "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/{appid}/header.jpg"
+            "https://shared.steamstatic.com/store_item_assets/steam/apps/{appid}/header.jpg"
         );
         out.push(MetadataCandidate {
             source: "steam".into(),

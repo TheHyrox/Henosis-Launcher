@@ -44,6 +44,82 @@ function getPlatformPosterAspectClass(platformId: string): string {
   return "poster-aspect-2-3";
 }
 
+const PosterWallImage: React.FC<{
+  game: Game;
+  platform: Platform;
+}> = ({ game, platform }) => {
+  const [stage, setStage] = useState<"cover" | "steam_cdn" | "header" | "hero" | "failed">("cover");
+
+  const steamCdn = game.steamAppId
+    ? `https://shared.steamstatic.com/store_item_assets/steam/apps/${game.steamAppId}/library_600x900.jpg`
+    : null;
+
+  useEffect(() => {
+    setStage("cover");
+  }, [game.id, game.cover, game.hero]);
+
+  const rawCover = mediaSrc(game.cover);
+  let src: string | null = null;
+
+  if (stage === "cover") {
+    if (rawCover) src = rawCover;
+    else if (steamCdn) src = steamCdn;
+    else if (game.metadata?.header) src = mediaSrc(game.metadata.header);
+    else if (game.hero) src = mediaSrc(game.hero);
+  } else if (stage === "steam_cdn") {
+    if (steamCdn && rawCover !== steamCdn) src = steamCdn;
+    else if (game.metadata?.header) src = mediaSrc(game.metadata.header);
+    else if (game.hero) src = mediaSrc(game.hero);
+  } else if (stage === "header") {
+    if (game.metadata?.header) src = mediaSrc(game.metadata.header);
+    else if (game.hero) src = mediaSrc(game.hero);
+  } else if (stage === "hero") {
+    if (game.hero) src = mediaSrc(game.hero);
+  }
+
+  const handleError = () => {
+    if (stage === "cover") {
+      if (steamCdn && rawCover !== steamCdn) setStage("steam_cdn");
+      else if (game.metadata?.header) setStage("header");
+      else if (game.hero) setStage("hero");
+      else setStage("failed");
+    } else if (stage === "steam_cdn") {
+      if (game.metadata?.header) setStage("header");
+      else if (game.hero) setStage("hero");
+      else setStage("failed");
+    } else if (stage === "header") {
+      if (game.hero) setStage("hero");
+      else setStage("failed");
+    } else {
+      setStage("failed");
+    }
+  };
+
+  if (!src || stage === "failed") {
+    return (
+      <div className="poster-card-fallback">
+        <span
+          className="poster-fallback-plat"
+          style={{ color: platform.accent, borderColor: platform.accent }}
+        >
+          {platform.shortName}
+        </span>
+        <strong className="poster-fallback-title">{game.title}</strong>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={game.title}
+      loading="lazy"
+      decoding="async"
+      onError={handleError}
+    />
+  );
+};
+
 export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) => {
   const {
     platforms,
@@ -362,7 +438,10 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
   const focusedFanArt =
     mediaSrc(focusedGame?.hero) ||
     mediaSrc(focusedGame?.metadata?.header) ||
-    mediaSrc(focusedGame?.cover);
+    mediaSrc(focusedGame?.cover) ||
+    (focusedGame?.steamAppId
+      ? `https://shared.steamstatic.com/store_item_assets/steam/apps/${focusedGame.steamAppId}/library_hero.jpg`
+      : null);
   const aspectClass = getPlatformPosterAspectClass(platform.id);
 
   return (
@@ -675,8 +754,6 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
               <div className="poster-wall-grid">
                 {visibleGames.map((g, idx) => {
                   const isFocused = idx === focusIdx;
-                  const coverUrl =
-                    mediaSrc(g.cover) || mediaSrc(g.metadata?.header) || mediaSrc(g.hero);
                   return (
                     <div
                       key={g.id}
@@ -702,19 +779,7 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
                       onDoubleClick={() => launchGame(g.id)}
                     >
                       <div className="poster-card-art">
-                        {coverUrl ? (
-                          <img src={coverUrl} alt={g.title} loading="lazy" />
-                        ) : (
-                          <div className="poster-card-fallback">
-                            <span
-                              className="poster-fallback-plat"
-                              style={{ color: platform.accent, borderColor: platform.accent }}
-                            >
-                              {platform.shortName}
-                            </span>
-                            <strong className="poster-fallback-title">{g.title}</strong>
-                          </div>
-                        )}
+                        <PosterWallImage game={g} platform={platform} />
                         <div className="poster-card-gloss" />
                         {g.favorite && <span className="poster-fav-badge">★</span>}
                       </div>
