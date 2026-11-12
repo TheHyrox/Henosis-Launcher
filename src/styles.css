@@ -55,6 +55,16 @@ button {
   cursor: pointer;
 }
 
+/* Hide idle cursor & disable pointer hover triggers when controller is active */
+html.controller-mode,
+html.controller-mode * {
+  cursor: none !important;
+}
+
+html.controller-mode .henosis-shell {
+  pointer-events: none !important;
+}
+
 code {
   font-family: "JetBrains Mono", "Fira Code", monospace;
 }
@@ -1473,6 +1483,10 @@ code {
   font-weight: 800;
 }
 
+.badge-accent {
+  color: var(--badge-contrast-text, #ffffff);
+}
+
 .badge-glass {
   background: rgba(255, 255, 255, 0.12);
 }
@@ -2069,9 +2083,16 @@ code {
 .dark-select {
   padding: 8px 12px;
   border-radius: 8px;
-  background: #0b0e17;
+  background: #0e1320;
   border: 1px solid var(--border-bright);
-  color: var(--text-primary);
+  color: #ffffff;
+  font-weight: 600;
+  color-scheme: dark;
+}
+
+.dark-select option {
+  background: #0e1320;
+  color: #ffffff;
 }
 
 .muted-box {
@@ -4125,7 +4146,7 @@ code {
   gap: 12px;
   font-size: 0.94rem;
   font-weight: 800;
-  color: #fff;
+  color: var(--hero-btn-contrast-text, #ffffff);
   box-shadow: 0 10px 28px color-mix(in srgb, var(--card-accent) 50%, transparent);
   transition: transform 160ms ease;
 }
@@ -4773,7 +4794,7 @@ body,
   border-radius: 6px;
   font-size: 0.75rem;
   font-weight: 800;
-  color: #fff;
+  color: var(--pill-contrast-text, #ffffff);
 }
 
 .qd-hero-action-row {

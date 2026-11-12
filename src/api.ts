@@ -380,3 +380,28 @@ export const api = {
   hideWindow: () => invoke<void>("hide_window"),
   quitApp: () => invoke<void>("quit_app"),
 };
+
+/** Compute accessible high-contrast foreground text color (#0b0e17 vs #ffffff) for any background hex */
+export function getContrastTextColor(hex?: string | null): string {
+  if (!hex) return "#ffffff";
+  const clean = hex.replace("#", "").trim();
+  let r = 0, g = 0, b = 0;
+  if (clean.length === 3) {
+    r = parseInt(clean[0] + clean[0], 16);
+    g = parseInt(clean[1] + clean[1], 16);
+    b = parseInt(clean[2] + clean[2], 16);
+  } else if (clean.length >= 6) {
+    r = parseInt(clean.substring(0, 2), 16);
+    g = parseInt(clean.substring(2, 4), 16);
+    b = parseInt(clean.substring(4, 6), 16);
+  } else {
+    return "#ffffff";
+  }
+  const toLinear = (c: number) => {
+    const v = c / 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  };
+  const lum = 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+  return lum > 0.42 ? "#0b0e17" : "#ffffff";
+}
+

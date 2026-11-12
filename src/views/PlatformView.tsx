@@ -12,6 +12,7 @@ import {
   formatPlaytime,
   formatRelativeDate,
   Game,
+  getContrastTextColor,
   mediaSrc,
   Platform,
 } from "../api";
@@ -671,7 +672,13 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
               <div className="spotlight-panel-inner">
                 <div className="spotlight-panel-left">
                   <div className="spotlight-panel-badges">
-                    <span className="badge-accent" style={{ background: platform.accent }}>
+                    <span
+                      className="badge-accent"
+                      style={{
+                        background: platform.accent,
+                        color: getContrastTextColor(platform.accent),
+                      }}
+                    >
                       {platform.shortName}
                     </span>
                     {focusedGame.region && <span className="badge-glass">{focusedGame.region}</span>}
@@ -873,7 +880,10 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
                   <div className="qd-pill-row">
                     <span
                       className="qd-console-pill"
-                      style={{ background: platform.accent }}
+                      style={{
+                        background: platform.accent,
+                        color: getContrastTextColor(platform.accent),
+                      }}
                     >
                       [{platform.name}]
                     </span>

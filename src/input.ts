@@ -22,6 +22,16 @@ const subs: Sub[] = [];
 let initialized = false;
 const padListeners = new Set<(info: { connected: boolean; name: string }) => void>();
 let lastPad: { connected: boolean; name: string } = { connected: false, name: "" };
+let lastInputType: "controller" | "mouse" | "keyboard" = "keyboard";
+
+function updateCursorVisibility() {
+  const isControllerActive = lastPad.connected && lastInputType === "controller";
+  if (isControllerActive) {
+    document.documentElement.classList.add("controller-mode");
+  } else {
+    document.documentElement.classList.remove("controller-mode");
+  }
+}
 
 export function onPadStatus(cb: (info: { connected: boolean; name: string }) => void): () => void {
   padListeners.add(cb);
@@ -83,15 +93,49 @@ export function initInputBus() {
   initialized = true;
 
   listen<PadEvent>("pad", (ev) => {
+    lastInputType = "controller";
+    updateCursorVisibility();
     dispatch(ev.payload.button, ev.payload.repeat);
   }).catch(() => {});
 
   listen<{ connected: boolean; name: string }>("pad-connection", (ev) => {
     lastPad = ev.payload;
+    if (lastPad.connected) {
+      lastInputType = "controller";
+    }
+    updateCursorVisibility();
     padListeners.forEach((cb) => cb(lastPad));
   }).catch(() => {});
 
+  window.addEventListener(
+    "pointermove",
+    (e) => {
+      // Ignore simulated or zero-movement events
+      if (e.movementX === 0 && e.movementY === 0) return;
+      if (lastInputType !== "mouse") {
+        lastInputType = "mouse";
+        updateCursorVisibility();
+      }
+    },
+    { passive: true }
+  );
+
+  window.addEventListener(
+    "pointerdown",
+    () => {
+      if (lastInputType !== "mouse") {
+        lastInputType = "mouse";
+        updateCursorVisibility();
+      }
+    },
+    { passive: true }
+  );
+
   window.addEventListener("keydown", (e) => {
+    if (lastInputType !== "keyboard") {
+      lastInputType = "keyboard";
+      updateCursorVisibility();
+    }
     const tag = (e.target as HTMLElement | null)?.tagName;
     if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
       if (e.key === "Escape") {

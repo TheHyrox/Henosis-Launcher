@@ -8,7 +8,7 @@
 // - Controller Mapping: D-Pad Left/Right cycle, LB/RB Maker Filter jump, A Open Console, X Rescan, Y Global Search
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { api, formatRelativeDate, PlatformSummary } from "../api";
+import { api, formatRelativeDate, getContrastTextColor, PlatformSummary } from "../api";
 import { ConsoleHardwareSvg } from "../components/Collectible";
 import { ConsoleEnvironment } from "../components/ConsoleEnvironment";
 import { BottomPromptBar } from "../components/TopBar";
@@ -275,7 +275,10 @@ export const HomeView: React.FC = () => {
                     {focused && (
                       <button
                         className="hero-card-enter-btn"
-                        style={{ background: plat.accent }}
+                        style={{
+                          background: plat.accent,
+                          color: getContrastTextColor(plat.accent),
+                        }}
                         onClick={(e) => {
                           e.stopPropagation();
                           navigate({ kind: "platform", platformId: plat.id });

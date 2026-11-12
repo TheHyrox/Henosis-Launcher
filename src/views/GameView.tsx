@@ -22,6 +22,7 @@ import {
   Game,
   GameMetadataUpdate,
   GameSettings,
+  getContrastTextColor,
   LaunchPreview,
   mediaSrc,
   MetadataCandidate,
@@ -1170,7 +1171,13 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
           {/* Center: Title, Console Pill, Green [PLAY NOW (A)] CTA & Operational Pills */}
           <div className="game-hero-meta">
             <div className="game-badges">
-              <span className="badge-accent" style={{ background: platform.accent }}>
+              <span
+                className="badge-accent"
+                style={{
+                  background: platform.accent,
+                  color: getContrastTextColor(platform.accent),
+                }}
+              >
                 [{platform.name}]
               </span>
               <span className="badge-glass">{platform.media.toUpperCase()}</span>
