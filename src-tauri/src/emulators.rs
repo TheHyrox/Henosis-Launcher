@@ -405,6 +405,8 @@ pub struct BuildContext<'a> {
     pub bios_dir: Option<&'a str>,
     /// Directory for temporary per-launch files.
     pub run_dir: &'a Path,
+    /// RetroAchievements (username, token), when logged in.
+    pub ra: Option<(String, String)>,
 }
 
 /// Build the full command (wrappers + emulator + arguments) for a game.
@@ -571,6 +573,13 @@ pub fn build_command(emu: &Emulator, ctx: &BuildContext) -> Result<CommandSpec, 
             }
         }
         "melonds" => {
+            if let Some((user, token)) = ctx.ra.as_ref() {
+                settings_args.extend([
+                    "--ra-user".into(), user.clone(),
+                    "--ra-token".into(), token.clone(),
+                    "--ra-hardcore".into(), "true".into(),
+                ]);
+            }
             if fullscreen {
                 settings_args.push("-f".into());
             }

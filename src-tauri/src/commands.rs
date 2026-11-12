@@ -197,6 +197,61 @@ pub fn save_igdb_credentials(state: State<AppState>, mut creds: IgdbCredentials)
     state.db.lock().kv_set("igdb_credentials", &creds).map_err(e)
 }
 
+// ── RetroAchievements ──────────────────────────────────────────────────────
+
+#[tauri::command]
+pub fn get_ra_credentials(state: State<AppState>) -> crate::retroachievements::RaCredentials {
+    state.db.lock().kv_get("ra_credentials").unwrap_or_default()
+}
+
+#[tauri::command]
+pub fn save_ra_credentials(state: State<AppState>, mut creds: crate::retroachievements::RaCredentials) -> R<()> {
+    creds.username = creds.username.trim().to_string();
+    creds.api_key = creds.api_key.trim().to_string();
+    // The token is managed by `ra_login`; keep it unless the username changed.
+    let prev: crate::retroachievements::RaCredentials = state.db.lock().kv_get("ra_credentials").unwrap_or_default();
+    creds.token = if prev.username == creds.username { prev.token } else { String::new() };
+    state.db.lock().kv_set("ra_credentials", &creds).map_err(e)
+}
+
+/// Log in with the RA password to obtain an emulator token. The password is not stored.
+#[tauri::command]
+pub async fn ra_login(app: AppHandle, username: String, password: String) -> R<()> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let username = username.trim().to_string();
+        let token = crate::retroachievements::login(&username, &password)?;
+        let state = app.state::<AppState>();
+        let db = state.db.lock();
+        let mut creds: crate::retroachievements::RaCredentials = db.kv_get("ra_credentials").unwrap_or_default();
+        creds.username = username;
+        creds.token = token;
+        db.kv_set("ra_credentials", &creds).map_err(e)
+    })
+    .await
+    .map_err(e)?
+}
+
+#[tauri::command]
+pub async fn test_ra_credentials(creds: crate::retroachievements::RaCredentials) -> R<String> {
+    tauri::async_runtime::spawn_blocking(move || crate::retroachievements::test_credentials(&creds))
+        .await
+        .map_err(e)?
+}
+
+#[tauri::command]
+pub async fn get_ra_achievements(
+    app: AppHandle,
+    game_id: i64,
+    refresh: bool,
+) -> R<crate::retroachievements::RaGameResult> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        crate::retroachievements::game_achievements(&state.db, game_id, refresh)
+    })
+    .await
+    .map_err(e)
+}
+
 // ── Scanning ───────────────────────────────────────────────────────────────
 
 #[derive(Clone, Serialize)]

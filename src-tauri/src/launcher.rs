@@ -119,7 +119,13 @@ pub fn build(state: &AppState, game: &Game) -> Result<CommandSpec, String> {
     let emu = resolve_emulator(state, game, &settings)?.ok_or("No emulator")?;
     let bios = state.db.lock().platform_config(&game.platform).ok().and_then(|c| c.bios_dir);
     let run_dir = state.data_dir.join("run");
-    emulators::build_command(&emu, &BuildContext { game, settings: &settings, bios_dir: bios.as_deref(), run_dir: &run_dir })
+    let ra = state
+        .db
+        .lock()
+        .kv_get::<crate::retroachievements::RaCredentials>("ra_credentials")
+        .filter(|c| !c.username.is_empty() && !c.token.is_empty())
+        .map(|c| (c.username, c.token));
+    emulators::build_command(&emu, &BuildContext { game, settings: &settings, bios_dir: bios.as_deref(), run_dir: &run_dir, ra })
 }
 
 pub fn launch(app: &AppHandle, game_id: i64) -> Result<(), String> {

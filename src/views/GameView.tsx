@@ -27,6 +27,7 @@ import {
   mediaSrc,
   MetadataCandidate,
   Platform,
+  RaGameResult,
   Session,
 } from "../api";
 import { CollectibleCard } from "../components/Collectible";
@@ -64,6 +65,7 @@ interface AchievementBadge {
   rarity: string;
   unlocked: boolean;
   unlockedAt?: string;
+  iconUrl?: string;
 }
 
 function buildGameAchievements(game: Game, platform: Platform): AchievementBadge[] {
@@ -560,11 +562,59 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
 
   const isGameRunning = running?.gameId === game?.id;
 
-  const achievements = useMemo(
-    () => (game && platform ? buildGameAchievements(game, platform) : []),
-    [game, platform]
-  );
+  const isSteamGame = game?.source === "steam";
+  const [ra, setRa] = useState<RaGameResult | null>(null);
+  const [raLoading, setRaLoading] = useState(false);
+  const loadRa = (refresh = false) => {
+    if (!game || isSteamGame) return;
+    setRaLoading(true);
+    api
+      .getRaAchievements(game.id, refresh)
+      .then(setRa)
+      .catch((err) => setRa({ status: "error", message: String(err), achievements: [] }))
+      .finally(() => setRaLoading(false));
+  };
+  useEffect(() => {
+    setRa(null);
+    loadRa(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game?.id]);
+
+  const achievements = useMemo<AchievementBadge[]>(() => {
+    if (!game || !platform) return [];
+    if (isSteamGame) return buildGameAchievements(game, platform);
+    return (ra?.achievements ?? []).map((a) => ({
+      id: String(a.id),
+      title: a.title,
+      desc: a.desc,
+      icon: "🏆",
+      iconUrl: a.badgeUrl,
+      points: a.points,
+      rarity: `${a.rarity}% of players`,
+      unlocked: a.unlocked,
+      unlockedAt: a.unlockedAt ? `${a.unlockedAt}${a.hardcore ? " · Hardcore" : ""}` : undefined,
+    }));
+  }, [game, platform, ra, isSteamGame]);
   const unlockedCount = achievements.filter((a) => a.unlocked).length;
+  const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
+  const raMessage = (() => {
+    if (isSteamGame) return null;
+    if (raLoading && !ra) return "Loading RetroAchievements…";
+    switch (ra?.status) {
+      case "no_credentials":
+        return "Add your RetroAchievements username and Web API key in Settings to see achievements.";
+      case "unsupported":
+        return "RetroAchievements does not support this platform.";
+      case "no_match":
+        return "No RetroAchievements set found for this game (matched by ROM hash and title).";
+      case "error":
+        return ra.message || "Could not reach RetroAchievements.";
+      case "ok":
+        return achievements.length === 0 ? "This game has no achievements yet." : null;
+      default:
+        return null;
+    }
+  })();
 
   // Overview interactive items:
   // 0: PLAY NOW (A)
@@ -1347,7 +1397,7 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
                 <div
                   className="bento-ach-progress-fill"
                   style={{
-                    width: `${Math.round((unlockedCount / achievements.length) * 100)}%`,
+                    width: `${pct(unlockedCount, achievements.length)}%`,
                   }}
                 />
               </div>
@@ -1357,7 +1407,15 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
                     key={a.id}
                     className={`bento-mini-badge ${a.unlocked ? "unlocked" : "locked"}`}
                   >
-                    <span className="mini-badge-icon">{a.unlocked ? a.icon : "🔒"}</span>
+                    <span className="mini-badge-icon">
+                      {a.iconUrl ? (
+                        <img src={a.iconUrl} alt="" style={{ width: 28, height: 28, borderRadius: 4 }} />
+                      ) : a.unlocked ? (
+                        a.icon
+                      ) : (
+                        "🔒"
+                      )}
+                    </span>
                     <span className="mini-badge-text">
                       {a.unlocked ? a.title : "Locked"}
                     </span>
@@ -1572,26 +1630,42 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
               </div>
               <div className="ach-summary-meter">
                 <span className="tabular-nums">
-                  {Math.round((unlockedCount / achievements.length) * 100)}% Complete
+                  {pct(unlockedCount, achievements.length)}% Complete
                 </span>
                 <div className="bento-ach-progress-bar">
                   <div
                     className="bento-ach-progress-fill"
                     style={{
-                      width: `${Math.round((unlockedCount / achievements.length) * 100)}%`,
+                      width: `${pct(unlockedCount, achievements.length)}%`,
                     }}
                   />
                 </div>
               </div>
             </div>
 
+            {raMessage && <p className="card-sub" style={{ margin: "12px 4px" }}>{raMessage}</p>}
+            {!isSteamGame && (
+              <div style={{ margin: "0 4px 10px" }}>
+                <button className="btn-ghost" disabled={raLoading} onClick={() => loadRa(true)}>
+                  {raLoading ? "Syncing…" : "↻ Sync RetroAchievements"}
+                </button>
+              </div>
+            )}
             <div className="ach-badges-grid">
               {achievements.map((a) => (
                 <div
                   key={a.id}
                   className={`ach-badge-card ${a.unlocked ? "is-unlocked" : "is-locked"}`}
                 >
-                  <div className="ach-badge-icon">{a.unlocked ? a.icon : "🔒"}</div>
+                  <div className="ach-badge-icon">
+                    {a.iconUrl ? (
+                      <img src={a.iconUrl} alt="" style={{ width: 56, height: 56, borderRadius: 6 }} />
+                    ) : a.unlocked ? (
+                      a.icon
+                    ) : (
+                      "🔒"
+                    )}
+                  </div>
                   <div className="ach-badge-body">
                     <div className="ach-badge-top">
                       <h4>{a.title}</h4>

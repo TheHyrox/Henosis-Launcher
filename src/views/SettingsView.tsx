@@ -5,7 +5,7 @@
 // 4. System & Controller (Xbox Guide button summon, autostart, hide on launch, UI sounds)
 
 import React, { useEffect, useState } from "react";
-import { api, Emulator, IgdbCredentials, PlatformConfig, ScanDir } from "../api";
+import { api, Emulator, IgdbCredentials, RaCredentials, PlatformConfig, ScanDir } from "../api";
 import { BottomPromptBar } from "../components/TopBar";
 import { usePad } from "../input";
 import { useStore } from "../store";
@@ -45,6 +45,8 @@ export const SettingsView: React.FC<{ initialSection?: SectionId }> = ({
   const [emuDirs, setEmuDirs] = useState<string[]>([]);
   const [platConfigs, setPlatConfigs] = useState<Record<string, PlatformConfig>>({});
   const [editingEmu, setEditingEmu] = useState<Emulator | null>(null);
+  const [ra, setRa] = useState<RaCredentials>({ username: "", apiKey: "" });
+  const [raPassword, setRaPassword] = useState("");
   const [igdb, setIgdb] = useState<IgdbCredentials>({ clientId: "", clientSecret: "" });
 
   const section = SECTIONS[secIdx].id;
@@ -54,6 +56,7 @@ export const SettingsView: React.FC<{ initialSection?: SectionId }> = ({
       api.getScanDirs(),
       api.getEmulatorDirs(),
       api.getIgdbCredentials(),
+      api.getRaCredentials().then(setRa).catch(() => {}),
     ]);
     setScanDirs(dirs);
     setEmuDirs(edirs);
@@ -686,6 +689,124 @@ export const SettingsView: React.FC<{ initialSection?: SectionId }> = ({
                   }}
                 >
                   Save IGDB Credentials
+                </button>
+              </div>
+            </div>
+
+            <div className="settings-card">
+              <h3>RetroAchievements</h3>
+              <p className="card-sub">
+                Show achievements and progress for retro games. Enter your RetroAchievements username and{" "}
+                <b>Web API key</b> (retroachievements.org → Settings → Keys).
+              </p>
+              <div className="form-grid" style={{ marginTop: 14 }}>
+                <label>
+                  <span>Username</span>
+                  <div className="input-with-btn">
+                    <input
+                      value={ra.username}
+                      placeholder="RetroAchievements username"
+                      onChange={(e) => setRa({ ...ra, username: e.target.value })}
+                    />
+                    <button
+                      className="btn-ghost"
+                      onClick={() =>
+                        openKeyboard({
+                          title: "RetroAchievements Username",
+                          initial: ra.username,
+                          onSubmit: (v) => setRa({ ...ra, username: v.trim() }),
+                        })
+                      }
+                    >
+                      ⌨
+                    </button>
+                  </div>
+                </label>
+                <label>
+                  <span>Web API Key</span>
+                  <div className="input-with-btn">
+                    <input
+                      type="password"
+                      value={ra.apiKey}
+                      placeholder="Web API key"
+                      onChange={(e) => setRa({ ...ra, apiKey: e.target.value })}
+                    />
+                    <button
+                      className="btn-ghost"
+                      onClick={() =>
+                        openKeyboard({
+                          title: "RetroAchievements Web API Key",
+                          initial: ra.apiKey,
+                          onSubmit: (v) => setRa({ ...ra, apiKey: v.trim() }),
+                        })
+                      }
+                    >
+                      ⌨
+                    </button>
+                  </div>
+                </label>
+              </div>
+              <label style={{ marginTop: 10 }}>
+                <span>Password (only used once to get an emulator token, never stored)</span>
+                <div className="input-with-btn">
+                  <input
+                    type="password"
+                    value={raPassword}
+                    placeholder="RetroAchievements password"
+                    onChange={(e) => setRaPassword(e.target.value)}
+                  />
+                  <button
+                    className="btn-ghost"
+                    onClick={() =>
+                      openKeyboard({
+                        title: "RetroAchievements Password",
+                        initial: raPassword,
+                        onSubmit: (v) => setRaPassword(v),
+                      })
+                    }
+                  >
+                    ⌨
+                  </button>
+                </div>
+              </label>
+              <div className="modal-actions" style={{ marginTop: 12 }}>
+                <button
+                  className="btn-ghost"
+                  onClick={async () => {
+                    try {
+                      const who = await api.testRaCredentials(ra);
+                      pushToast(`Connected: ${who}`, "success");
+                    } catch (err) {
+                      pushToast(`RetroAchievements: ${String(err)}`, "error");
+                    }
+                  }}
+                >
+                  Test Connection
+                </button>
+                <button
+                  className="btn-ghost"
+                  title="Log in so emulators with native support (melonDS) unlock achievements while you play"
+                  onClick={async () => {
+                    try {
+                      await api.saveRaCredentials(ra);
+                      await api.raLogin(ra.username, raPassword);
+                      setRaPassword("");
+                      pushToast("Emulator login OK — in-game achievements enabled", "success");
+                    } catch (err) {
+                      pushToast(`RetroAchievements: ${String(err)}`, "error");
+                    }
+                  }}
+                >
+                  Log In for Emulators
+                </button>
+                <button
+                  className="btn-primary"
+                  onClick={async () => {
+                    await api.saveRaCredentials(ra);
+                    pushToast("RetroAchievements credentials saved", "success");
+                  }}
+                >
+                  Save RetroAchievements
                 </button>
               </div>
             </div>

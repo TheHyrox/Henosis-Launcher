@@ -8,6 +8,7 @@ pub mod launcher;
 pub mod metadata;
 pub mod models;
 pub mod platforms;
+pub mod retroachievements;
 pub mod scanner;
 pub mod settings;
 pub mod sfo;
@@ -158,6 +159,11 @@ pub fn run() {
             commands::fetch_platform_metadata,
             commands::get_igdb_credentials,
             commands::save_igdb_credentials,
+            commands::get_ra_credentials,
+            commands::save_ra_credentials,
+            commands::test_ra_credentials,
+            commands::ra_login,
+            commands::get_ra_achievements,
             commands::scan_library,
             commands::get_scan_dirs,
             commands::save_scan_dir,

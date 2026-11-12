@@ -244,6 +244,33 @@ export interface IgdbCredentials {
   accessToken?: string | null;
 }
 
+export interface RaCredentials {
+  username: string;
+  apiKey: string;
+  token?: string;
+}
+
+export interface RaAchievement {
+  id: number;
+  title: string;
+  desc: string;
+  points: number;
+  badgeUrl: string;
+  unlocked: boolean;
+  hardcore: boolean;
+  unlockedAt?: string | null;
+  rarity: number;
+}
+
+export interface RaGameResult {
+  status: "ok" | "no_credentials" | "unsupported" | "no_match" | "error";
+  message?: string | null;
+  raGameId?: number | null;
+  title?: string | null;
+  iconUrl?: string | null;
+  achievements: RaAchievement[];
+}
+
 export interface Place {
   name: string;
   path: string;
@@ -342,6 +369,12 @@ export const api = {
     invoke<Game>("reset_game_metadata", { id, rescrape }),
   fetchPlatformMetadata: (platform: string) =>
     invoke<number>("fetch_platform_metadata", { platform }),
+  getRaCredentials: () => invoke<RaCredentials>("get_ra_credentials"),
+  saveRaCredentials: (creds: RaCredentials) => invoke<void>("save_ra_credentials", { creds }),
+  raLogin: (username: string, password: string) => invoke<void>("ra_login", { username, password }),
+  testRaCredentials: (creds: RaCredentials) => invoke<string>("test_ra_credentials", { creds }),
+  getRaAchievements: (gameId: number, refresh = false) =>
+    invoke<RaGameResult>("get_ra_achievements", { gameId, refresh }),
   getIgdbCredentials: () => invoke<IgdbCredentials>("get_igdb_credentials"),
   saveIgdbCredentials: (creds: IgdbCredentials) =>
     invoke<void>("save_igdb_credentials", { creds }),
