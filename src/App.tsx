@@ -84,6 +84,20 @@ export const App: React.FC = () => {
       listen<RunningGame>("game-started", (ev) => {
         setRunning(ev.payload);
       }),
+      listen<{
+        gameId: number;
+        id: number;
+        title: string;
+        desc?: string;
+        points: number;
+        hardcore?: boolean;
+      }>("ra-unlocked", (ev) => {
+        const p = ev.payload;
+        pushToast(
+          `🏆 Achievement Unlocked: ${p.title} (${p.points} PTS${p.hardcore ? " · Hardcore" : ""})`,
+          "success"
+        );
+      }),
       listen<{ gameId: number; duration: number; error: string | null }>("game-ended", (ev) => {
         setRunning(null);
         refreshOverview();

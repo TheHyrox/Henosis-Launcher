@@ -124,7 +124,7 @@ pub fn build(state: &AppState, game: &Game) -> Result<CommandSpec, String> {
         .lock()
         .kv_get::<crate::retroachievements::RaCredentials>("ra_credentials")
         .filter(|c| !c.username.is_empty() && !c.token.is_empty())
-        .map(|c| (c.username, c.token));
+        .map(|c| (c.username, c.token, settings.ra_hardcore.unwrap_or(c.hardcore)));
     emulators::build_command(&emu, &BuildContext { game, settings: &settings, bios_dir: bios.as_deref(), run_dir: &run_dir, ra })
 }
 
@@ -210,6 +210,38 @@ pub fn launch(app: &AppHandle, game_id: i64) -> Result<(), String> {
                     wait_until_emulator_window_ready(child_pid, &stop_hide);
                     if !stop_hide.load(Ordering::Relaxed) {
                         window::hide(&app_hide);
+                    }
+                });
+            }
+            // Tail the emulator log for real-time RetroAchievements unlock lines.
+            {
+                let app_ra = app2.clone();
+                let stop_ra = stop.clone();
+                let log_ra = log_path.clone();
+                let gid = running.game_id;
+                std::thread::spawn(move || {
+                    let mut pos = 0usize;
+                    while !stop_ra.load(Ordering::Relaxed) {
+                        if let Ok(content) = std::fs::read_to_string(&log_ra) {
+                            if content.len() > pos {
+                                let chunk = &content[pos..];
+                                if let Some(last_nl) = chunk.rfind('\n') {
+                                    let lines_slice = &chunk[..=last_nl];
+                                    pos += last_nl + 1;
+                                    for line in lines_slice.lines() {
+                                        if let Some(json_str) = line.strip_prefix("[HENOSIS_RA_UNLOCK]") {
+                                            if let Ok(mut val) = serde_json::from_str::<serde_json::Value>(json_str) {
+                                                if let Some(obj) = val.as_object_mut() {
+                                                    obj.insert("gameId".into(), serde_json::json!(gid));
+                                                }
+                                                let _ = app_ra.emit("ra-unlocked", val);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        std::thread::sleep(Duration::from_millis(400));
                     }
                 });
             }

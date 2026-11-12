@@ -45,7 +45,7 @@ export const SettingsView: React.FC<{ initialSection?: SectionId }> = ({
   const [emuDirs, setEmuDirs] = useState<string[]>([]);
   const [platConfigs, setPlatConfigs] = useState<Record<string, PlatformConfig>>({});
   const [editingEmu, setEditingEmu] = useState<Emulator | null>(null);
-  const [ra, setRa] = useState<RaCredentials>({ username: "", apiKey: "" });
+  const [ra, setRa] = useState<RaCredentials>({ username: "", apiKey: "", hardcore: true });
   const [raPassword, setRaPassword] = useState("");
   const [igdb, setIgdb] = useState<IgdbCredentials>({ clientId: "", clientSecret: "" });
 
@@ -745,6 +745,30 @@ export const SettingsView: React.FC<{ initialSection?: SectionId }> = ({
                     </button>
                   </div>
                 </label>
+              </div>
+              <div className="sys-row" style={{ marginTop: 12 }}>
+                <div>
+                  <strong>Hardcore Mode (Default)</strong>
+                  <p>
+                    When enabled, savestates, cheats, slow-motion, frame-step, and RAM search are disabled and grayed out in melonDS / RetroArch. Turn off to play chill in Softcore mode.
+                  </p>
+                </div>
+                <button
+                  className={`toggle-pill ${(ra.hardcore ?? true) ? "on" : "off"}`}
+                  onClick={async () => {
+                    const next = { ...ra, hardcore: !(ra.hardcore ?? true) };
+                    setRa(next);
+                    await api.saveRaCredentials(next);
+                    pushToast(
+                      next.hardcore
+                        ? "RetroAchievements Hardcore Mode enabled"
+                        : "RetroAchievements Softcore (Chill) Mode enabled",
+                      "info"
+                    );
+                  }}
+                >
+                  {(ra.hardcore ?? true) ? "Hardcore" : "Softcore (Chill)"}
+                </button>
               </div>
               <label style={{ marginTop: 10 }}>
                 <span>Password (only used once to get an emulator token, never stored)</span>

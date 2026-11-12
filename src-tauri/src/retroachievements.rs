@@ -16,13 +16,30 @@ use crate::db::Db;
 const API: &str = "https://retroachievements.org/API";
 pub const BADGE_URL: &str = "https://media.retroachievements.org/Badge";
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct RaCredentials {
     pub username: String,
     pub api_key: String,
     /// Login token for in-emulator achievements (obtained with the password, which is never stored).
     pub token: String,
+    #[serde(default = "default_hardcore")]
+    pub hardcore: bool,
+}
+
+fn default_hardcore() -> bool {
+    true
+}
+
+impl Default for RaCredentials {
+    fn default() -> Self {
+        Self {
+            username: String::new(),
+            api_key: String::new(),
+            token: String::new(),
+            hardcore: true,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

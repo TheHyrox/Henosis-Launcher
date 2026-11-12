@@ -13,6 +13,7 @@
 // - Hotkey Mapper Modal (Y Button): Custom hotkey bindings (Fast-Forward, Save State, Load State).
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import {
   api,
   Emulator,
@@ -263,6 +264,9 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
   };
 
   // Build controller-navigable rows for the Per-Game Emulator Config tab.
+  const isGameRunning = running?.gameId === game?.id;
+  const isSteamGame = game?.source === "steam";
+
   const settingRows: SettingRowSpec[] = useMemo(() => {
     if (!game) return [];
     const s = game.settings || {};
@@ -461,6 +465,25 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
       onClear: () => updateSettings({ vsync: null }),
     });
 
+    if (!isSteamGame) {
+      rows.push({
+        id: "raHardcore",
+        group: "RetroAchievements",
+        label: "Achievement Mode (Hardcore / Softcore Chill)",
+        hint: "Hardcore grays out & disables savestates, cheats, slow-mo, and frame-step. Softcore lets you play chill.",
+        valueLabel:
+          s.raHardcore === true
+            ? "Hardcore (Forced)"
+            : s.raHardcore === false
+            ? "Softcore / Chill (Forced)"
+            : "Global Default (Settings)",
+        isOverridden: s.raHardcore !== null && s.raHardcore !== undefined,
+        onStep: (dir) => updateSettings({ raHardcore: cycle(triBool, s.raHardcore ?? null, dir) }),
+        onActivate: () => updateSettings({ raHardcore: cycle(triBool, s.raHardcore ?? null, 1) }),
+        onClear: () => updateSettings({ raHardcore: null }),
+      });
+    }
+
     // Custom Launch Arguments & Save State Paths
     rows.push({
       id: "inputProfile",
@@ -545,7 +568,7 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
     });
 
     return rows;
-  }, [game, preview, compatibleEmulators, cores]);
+  }, [game, preview, compatibleEmulators, cores, isSteamGame]);
 
   const settingRowsRef = useRef<HTMLDivElement | null>(null);
   const safeSettingIdx = Math.min(settingIdx, Math.max(0, settingRows.length - 1));
@@ -560,9 +583,6 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
     }
   }, [safeSettingIdx, tab]);
 
-  const isGameRunning = running?.gameId === game?.id;
-
-  const isSteamGame = game?.source === "steam";
   const [ra, setRa] = useState<RaGameResult | null>(null);
   const [raLoading, setRaLoading] = useState(false);
   const loadRa = (refresh = false) => {
@@ -579,6 +599,29 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
     loadRa(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.id]);
+
+  // Refresh achievements automatically when a game session ends or when an achievement unlocks live.
+  const prevRunningRef = useRef(isGameRunning);
+  useEffect(() => {
+    if (prevRunningRef.current && !isGameRunning) {
+      loadRa(false);
+    }
+    prevRunningRef.current = isGameRunning;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGameRunning]);
+
+  useEffect(() => {
+    if (!game || isSteamGame) return;
+    const unsubPromise = listen<{ gameId: number }>("ra-unlocked", (ev) => {
+      if (ev.payload.gameId === game.id) {
+        loadRa(false);
+      }
+    });
+    return () => {
+      unsubPromise.then((fn) => fn());
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game?.id, isSteamGame]);
 
   const achievements = useMemo<AchievementBadge[]>(() => {
     if (!game || !platform) return [];

@@ -31,6 +31,8 @@ pub struct GameSettings {
     pub fullscreen: Option<bool>,
     /// Nintendo Switch mode: true = Docked (1080p), false = Handheld (720p).
     pub docked_mode: Option<bool>,
+    /// RetroAchievements Hardcore mode override (None = use global RA setting).
+    pub ra_hardcore: Option<bool>,
     /// Scaling filter: "nearest" | "bilinear" | "bicubic" | "scaleforce" | "fsr"
     pub scaling_filter: Option<String>,
     /// Boot mode: "direct" | "firmware"
@@ -79,7 +81,7 @@ impl GameSettings {
         merge_fields!(
             out, over, emulator_id, core, graphics_api, resolution_scale, vsync, fps_limit,
             aspect_ratio, screen_layout, screen_rotation, swap_screens, screen_gap, fullscreen,
-            docked_mode, scaling_filter, boot_mode, render_3d, cpu_overclock, input_profile,
+            docked_mode, ra_hardcore, scaling_filter, boot_mode, render_3d, cpu_overclock, input_profile,
             launch_args, env, gamemode, mangohud, gamescope, gamescope_args, config_overrides,
             mods_enabled, mod_links, advanced
         );

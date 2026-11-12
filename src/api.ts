@@ -62,6 +62,7 @@ export interface GameSettings {
   screenGap?: number | null;
   fullscreen?: boolean | null;
   dockedMode?: boolean | null;
+  raHardcore?: boolean | null;
   scalingFilter?: string | null;
   bootMode?: string | null;
   render3d?: string | null;
@@ -248,6 +249,7 @@ export interface RaCredentials {
   username: string;
   apiKey: string;
   token?: string;
+  hardcore?: boolean;
 }
 
 export interface RaAchievement {
