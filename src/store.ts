@@ -34,6 +34,12 @@ export interface FileBrowserModalState {
   onPick: (path: string) => void;
 }
 
+export interface SessionErrorState {
+  gameId: number;
+  title: string;
+  message: string;
+}
+
 export interface Toast {
   id: number;
   text: string;
@@ -59,6 +65,10 @@ interface Store {
   scanning: boolean;
   scanStatus: string;
   quickMenuOpen: boolean;
+  sessionOverlayOpen: boolean;
+  sessionError: SessionErrorState | null;
+  holdXProgress: number;
+  holdBProgress: number;
   keyboardModal: KeyboardModalState | null;
   fileBrowserModal: FileBrowserModalState | null;
   toasts: Toast[];
@@ -80,6 +90,10 @@ interface Store {
   updateAppSettings: (next: AppSettings) => Promise<void>;
 
   setQuickMenu: (open: boolean) => void;
+  setSessionOverlayOpen: (open: boolean) => void;
+  setSessionError: (err: SessionErrorState | null) => void;
+  setHoldXProgress: (p: number) => void;
+  setHoldBProgress: (p: number) => void;
   openKeyboard: (cfg: KeyboardModalState) => void;
   closeKeyboard: () => void;
   openFileBrowser: (cfg: FileBrowserModalState) => void;
@@ -120,6 +134,10 @@ export const useStore = create<Store>((set, get) => ({
   scanning: false,
   scanStatus: "",
   quickMenuOpen: false,
+  sessionOverlayOpen: false,
+  sessionError: null,
+  holdXProgress: 0,
+  holdBProgress: 0,
   keyboardModal: null,
   fileBrowserModal: null,
   toasts: [],
@@ -172,7 +190,7 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   goHome: () => {
-    set({ screen: { kind: "home" }, history: [], quickMenuOpen: false });
+    set({ screen: { kind: "home" }, history: [], quickMenuOpen: false, sessionOverlayOpen: false });
   },
 
   setHomeIndex: (idx) => set({ homeIndex: idx }),
@@ -205,6 +223,7 @@ export const useStore = create<Store>((set, get) => ({
 
   launchGame: async (gameId) => {
     try {
+      set({ sessionError: null });
       sfx.launch();
       await api.launchGame(gameId);
     } catch (e) {
@@ -230,6 +249,10 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   setQuickMenu: (open) => set({ quickMenuOpen: open }),
+  setSessionOverlayOpen: (open) => set({ sessionOverlayOpen: open }),
+  setSessionError: (err) => set({ sessionError: err }),
+  setHoldXProgress: (p) => set({ holdXProgress: p }),
+  setHoldBProgress: (p) => set({ holdBProgress: p }),
   openKeyboard: (cfg) => set({ keyboardModal: cfg }),
   closeKeyboard: () => set({ keyboardModal: null }),
   openFileBrowser: (cfg) => set({ fileBrowserModal: cfg }),

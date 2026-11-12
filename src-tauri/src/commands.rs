@@ -381,8 +381,8 @@ pub async fn launch_game(app: AppHandle, id: i64) -> R<()> {
 }
 
 #[tauri::command]
-pub fn stop_game(state: State<AppState>) -> R<()> {
-    launcher::stop(&state)
+pub fn stop_game(app: AppHandle, state: State<AppState>) -> R<()> {
+    launcher::stop(&app, &state)
 }
 
 #[tauri::command]
@@ -391,8 +391,17 @@ pub fn get_running(state: State<AppState>) -> Option<RunningGame> {
 }
 
 #[tauri::command]
-pub fn resume_game(app: AppHandle) {
-    window::hide(&app);
+pub fn resume_game(app: AppHandle, state: State<AppState>) {
+    let running = state.running.lock().clone();
+    let pids: Vec<u32> = match running {
+        Some(r) => match (r.pgid, r.steam_app_id) {
+            (Some(pg), _) => vec![pg],
+            (None, Some(appid)) => launcher::steam_pids(appid),
+            _ => vec![],
+        },
+        None => vec![],
+    };
+    window::focus_pid(&app, &pids);
 }
 
 #[derive(Serialize)]

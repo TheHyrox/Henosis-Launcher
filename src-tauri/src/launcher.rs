@@ -23,6 +23,10 @@ pub struct RunningGame {
     pub game_id: i64,
     pub title: String,
     pub platform: String,
+    pub runner: String,
+    pub cover: Option<String>,
+    pub status: String,
+    pub status_message: Option<String>,
     pub started: i64,
     #[serde(skip)]
     pub pgid: Option<u32>,
@@ -30,6 +34,22 @@ pub struct RunningGame {
     pub steam_app_id: Option<u32>,
     #[serde(skip)]
     pub stop: Arc<AtomicBool>,
+}
+
+fn emit_session_state(app: &AppHandle, state: &AppState, status: &str, status_message: Option<String>) {
+    let updated = {
+        let mut guard = state.running.lock();
+        if let Some(ref mut r) = *guard {
+            r.status = status.to_string();
+            r.status_message = status_message;
+            Some(r.clone())
+        } else {
+            None
+        }
+    };
+    if let Some(r) = updated {
+        let _ = app.emit("session-state", &r);
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -173,10 +193,35 @@ pub fn launch(app: &AppHandle, game_id: i64) -> Result<(), String> {
     };
     let stop = Arc::new(AtomicBool::new(false));
     let is_steam = game.source == "steam";
+    let runner = if is_steam {
+        "Steam".to_string()
+    } else if game.platform == "pc" {
+        "PC".to_string()
+    } else {
+        resolve_emulator(&state, &game, &settings)
+            .ok()
+            .flatten()
+            .map(|e| e.name)
+            .unwrap_or_else(|| "Emulator".to_string())
+    };
+    let cover = game
+        .cover
+        .clone()
+        .or_else(|| game.metadata.get("header").and_then(|v| v.as_str()).map(|s| s.to_string()))
+        .or_else(|| game.hero.clone());
+    let status_message = Some(if is_steam {
+        "Waiting for Steam game process…".to_string()
+    } else {
+        "Preparing emulator & applying per-game configuration…".to_string()
+    });
     let running = RunningGame {
         game_id: game.id,
         title: game.title.clone(),
         platform: game.platform.clone(),
+        runner,
+        cover,
+        status: "STARTING".to_string(),
+        status_message,
         started: now(),
         pgid: (!is_steam).then_some(child.id()),
         steam_app_id: game.steam_app_id,
@@ -184,6 +229,7 @@ pub fn launch(app: &AppHandle, game_id: i64) -> Result<(), String> {
     };
     *state.running.lock() = Some(running.clone());
     let _ = app.emit("game-started", &running);
+    let _ = app.emit("session-state", &running);
 
     let hide = state.db.lock().app_settings().hide_on_launch;
     let child_pid = child.id();
@@ -203,13 +249,17 @@ pub fn launch(app: &AppHandle, game_id: i64) -> Result<(), String> {
                 track_steam(&app2, appid, &stop, hide);
             }
         } else {
-            if hide {
-                let app_hide = app2.clone();
-                let stop_hide = stop.clone();
+            {
+                let app_ready = app2.clone();
+                let stop_ready = stop.clone();
                 std::thread::spawn(move || {
-                    wait_until_emulator_window_ready(child_pid, &stop_hide);
-                    if !stop_hide.load(Ordering::Relaxed) {
-                        window::hide(&app_hide);
+                    wait_until_emulator_window_ready(child_pid, &stop_ready);
+                    if !stop_ready.load(Ordering::Relaxed) {
+                        let st = app_ready.state::<AppState>();
+                        emit_session_state(&app_ready, &st, "RUNNING", None);
+                        if hide {
+                            window::hide(&app_ready);
+                        }
                     }
                 });
             }
@@ -246,7 +296,11 @@ pub fn launch(app: &AppHandle, game_id: i64) -> Result<(), String> {
                 });
             }
             match child.wait() {
-                Ok(status) if !status.success() && started_at.elapsed() < Duration::from_secs(5) => {
+                Ok(status)
+                    if !status.success()
+                        && !stop.load(Ordering::Relaxed)
+                        && started_at.elapsed() < Duration::from_secs(5) =>
+                {
                     let tail = std::fs::read_to_string(&log_path).unwrap_or_default();
                     let tail: Vec<&str> = tail.lines().rev().take(8).collect();
                     let tail: Vec<&str> = tail.into_iter().rev().collect();
@@ -321,8 +375,12 @@ fn track_steam(app: &AppHandle, appid: u32, stop: &AtomicBool, hide: bool) {
     }
     // Give the game window a brief moment to map on screen before hiding the launcher.
     std::thread::sleep(Duration::from_millis(1200));
-    if hide && !stop.load(Ordering::Relaxed) {
-        window::hide(app);
+    if !stop.load(Ordering::Relaxed) {
+        let st = app.state::<AppState>();
+        emit_session_state(app, &st, "RUNNING", None);
+        if hide {
+            window::hide(app);
+        }
     }
     while !steam_pids(appid).is_empty() {
         if stop.load(Ordering::Relaxed) {
@@ -348,9 +406,10 @@ pub fn steam_pids(appid: u32) -> Vec<u32> {
     pids
 }
 
-pub fn stop(state: &AppState) -> Result<(), String> {
+pub fn stop(app: &AppHandle, state: &AppState) -> Result<(), String> {
     let running = state.running.lock().clone().ok_or("No game running")?;
     running.stop.store(true, Ordering::Relaxed);
+    emit_session_state(app, state, "STOPPING", Some("Closing session & flushing saves…".to_string()));
     let signal = |sig: &str, targets: Vec<String>| {
         if !targets.is_empty() {
             let _ = Command::new("kill").arg(sig).arg("--").args(targets).status();
@@ -363,7 +422,7 @@ pub fn stop(state: &AppState) -> Result<(), String> {
     };
     signal("-TERM", targets.clone());
     std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_secs(4));
+        std::thread::sleep(Duration::from_millis(2500));
         signal("-KILL", targets);
     });
     Ok(())

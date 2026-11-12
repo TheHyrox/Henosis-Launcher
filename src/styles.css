@@ -76,13 +76,22 @@ code {
   flex-direction: column;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
   position: relative;
 }
 
 .henosis-stage {
   flex: 1;
+  min-height: 0;
   position: relative;
   overflow: hidden;
+  z-index: 10;
+}
+
+.henosis-footer-slot {
+  flex-shrink: 0;
+  z-index: 30;
 }
 
 .ambient-backdrop {
@@ -233,10 +242,8 @@ code {
 /* ── Bottom Controller Prompt Bar ────────────────────────────────────────── */
 
 .promptbar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  position: relative;
+  width: 100%;
   height: 54px;
   padding: 0 36px;
   display: flex;
@@ -245,7 +252,8 @@ code {
   background: linear-gradient(180deg, rgba(7, 8, 13, 0.75) 0%, rgba(7, 8, 13, 0.98) 100%);
   backdrop-filter: blur(14px);
   border-top: 1px solid var(--border-subtle);
-  z-index: 100;
+  z-index: 30;
+  flex-shrink: 0;
   transform: translateZ(0);
 }
 
@@ -4712,7 +4720,7 @@ body,
   position: absolute;
   top: 0;
   right: 0;
-  bottom: 40px;
+  bottom: 0;
   width: 38%;
   min-width: 390px;
   max-width: 560px;
@@ -5691,5 +5699,506 @@ body,
 }
 
 .meta-candidate-cta {
+  flex-shrink: 0;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PERSISTENT SESSION DOCK & QUICK SESSION OVERLAY MODAL (R3)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.session-dock {
+  position: fixed;
+  left: 24px;
+  bottom: 54px;
+  width: 340px;
+  max-width: calc(100vw - 48px);
+  border-radius: 14px;
+  opacity: 0;
+  transform: translateY(16px) scale(0.97);
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 30;
+  background: rgba(16, 22, 34, 0.9);
+  backdrop-filter: blur(22px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.65);
+  transition:
+    transform 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 220ms ease,
+    box-shadow 220ms ease,
+    border-color 220ms ease;
+}
+
+.session-dock.is-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.session-dock.is-starting {
+  border-color: rgba(245, 158, 11, 0.35);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.65), 0 0 20px rgba(245, 158, 11, 0.16);
+}
+
+.session-dock.is-running {
+  border-color: rgba(0, 230, 118, 0.32);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.65), 0 0 22px rgba(0, 230, 118, 0.18);
+}
+
+.session-dock.is-stopping {
+  border-color: rgba(245, 158, 11, 0.45);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.65), 0 0 20px rgba(245, 158, 11, 0.22);
+}
+
+.session-dock.is-error {
+  border-color: rgba(239, 68, 68, 0.65);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.65), 0 0 24px rgba(239, 68, 68, 0.28);
+}
+
+.session-dock-inner {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.session-dock-top {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.session-dock-thumb {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
+}
+
+.session-dock-thumb-fallback,
+.session-dock-thumb-err {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(30, 41, 59, 0.85);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.session-dock-thumb-err {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #fca5a5;
+}
+
+.session-dock-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.session-dock-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.session-dock-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #F8FAFC;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-dock-runner-pill {
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 11px;
+  font-weight: 600;
+  color: #CBD5E1;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.session-dock-badge.badge-err {
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #fca5a5;
+  flex-shrink: 0;
+}
+
+.session-dock-sub {
+  font-size: 12px;
+  font-weight: 500;
+  color: #94A3B8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-dock-sub-amber {
+  color: #fbbf24;
+}
+
+.session-dock-sub-err {
+  color: #fca5a5;
+}
+
+.session-dock-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.session-dock-status-running {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: #00E676;
+  letter-spacing: 0.04em;
+}
+
+.session-dock-status-stopping {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: #fbbf24;
+  letter-spacing: 0.04em;
+}
+
+.session-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.session-dot.dot-emerald {
+  background: #00E676;
+  box-shadow: 0 0 8px #00E676;
+  animation: sessionPulse 1.6s ease-in-out infinite;
+}
+
+.session-dot.dot-amber {
+  background: #f59e0b;
+  box-shadow: 0 0 8px #f59e0b;
+  animation: sessionPulse 1s ease-in-out infinite;
+}
+
+@keyframes sessionPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.85); }
+}
+
+.session-dock-sep {
+  color: #475569;
+}
+
+.session-dock-timer {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+/* Bottom Cluster: Controller Actions */
+.session-dock-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.session-dock-actions > .session-dock-btn,
+.session-dock-actions > .session-dock-hold-btn {
+  flex: 1;
+  justify-content: center;
+}
+
+.session-progress-track {
+  width: 100%;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  position: relative;
+}
+
+.session-progress-bar {
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #f59e0b, #00E676);
+  animation: sessionSlide 1.3s ease-in-out infinite;
+}
+
+@keyframes sessionSlide {
+  0% { transform: translateX(-110%); }
+  100% { transform: translateX(240%); }
+}
+
+.session-dock-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 13px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 12px;
+  font-weight: 600;
+  color: #e2e8f0;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.session-dock-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.session-dock-btn-logs {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.45);
+  color: #fecaca;
+}
+
+.r3-kbd {
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(51, 65, 85, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 10px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.session-dock-hold-btn {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  transition: transform 140ms ease;
+}
+
+.session-dock-hold-btn.is-stop {
+  background: rgba(244, 63, 94, 0.15);
+  border: 1px solid rgba(244, 63, 94, 0.35);
+  color: #fda4af;
+}
+
+.session-dock-hold-btn.is-cancel {
+  background: rgba(245, 158, 11, 0.16);
+  border: 1px solid rgba(245, 158, 11, 0.38);
+  color: #fde68a;
+}
+
+.session-dock-hold-btn .xbox-btn,
+.session-hold-label {
+  position: relative;
+  z-index: 2;
+}
+
+.session-hold-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: 1;
+  pointer-events: none;
+  transition: width 40ms linear;
+}
+
+.session-hold-fill.fill-crimson {
+  background: rgba(244, 63, 94, 0.45);
+}
+
+.session-hold-fill.fill-amber {
+  background: rgba(245, 158, 11, 0.42);
+}
+
+.session-dock-closing-pill {
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.14);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  font-size: 12px;
+  font-weight: 600;
+  color: #fbbf24;
+}
+
+/* ── Quick Session Overlay Modal (R3) ── */
+
+.session-overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(7, 10, 16, 0.75);
+  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.session-overlay-modal {
+  width: 480px;
+  max-width: 92vw;
+  padding: 24px;
+  border-radius: 18px;
+  background: rgba(16, 22, 34, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.78);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.session-overlay-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.session-overlay-cover {
+  width: 60px;
+  height: 78px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  flex-shrink: 0;
+}
+
+.session-overlay-cover-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(30, 41, 59, 0.8);
+  font-size: 1.6rem;
+}
+
+.session-overlay-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.session-overlay-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #00E676;
+}
+
+.session-overlay-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #F8FAFC;
+  line-height: 1.25;
+}
+
+.session-overlay-pills {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.session-overlay-plat-badge {
+  padding: 2px 9px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.session-overlay-timer {
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 600;
+  color: #94A3B8;
+}
+
+.session-overlay-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.session-overlay-item {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  text-align: left;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1.5px solid transparent;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.session-overlay-item.focused {
+  background: rgba(124, 92, 255, 0.16);
+  border-color: var(--accent-default);
+}
+
+.session-overlay-item.danger.focused {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: #ef4444;
+}
+
+.session-overlay-item-text {
+  position: relative;
+  z-index: 2;
+}
+
+.session-overlay-item-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: #F8FAFC;
+}
+
+.session-overlay-item-sub {
+  font-size: 12px;
+  color: #94A3B8;
+  margin-top: 2px;
+}
+
+.session-overlay-btn-badge {
+  position: relative;
+  z-index: 2;
+  width: auto !important;
+  min-width: 24px;
+  padding: 0 7px;
   flex-shrink: 0;
 }

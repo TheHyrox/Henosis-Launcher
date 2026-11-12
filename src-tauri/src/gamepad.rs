@@ -18,6 +18,11 @@ pub struct PadEvent {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct PadReleaseEvent {
+    pub button: &'static str,
+}
+
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PadInfo {
     pub connected: bool,
@@ -113,6 +118,9 @@ fn run(app: AppHandle) {
                 EventType::ButtonReleased(b, _) => {
                     if let Some(name) = map_button(b) {
                         held.remove(name);
+                        if state.visible.load(Ordering::Relaxed) && state.focused.load(Ordering::Relaxed) {
+                            let _ = app.emit("pad-release", PadReleaseEvent { button: name });
+                        }
                     }
                 }
                 EventType::AxisChanged(axis, value, _) => {

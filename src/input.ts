@@ -8,6 +8,7 @@ import { useEffect, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { PadButton, PadEvent } from "./api";
 import { sfx } from "./sound";
+import { useStore } from "./store";
 
 export type PadHandler = (button: PadButton, repeat: boolean) => boolean | void;
 
@@ -83,8 +84,113 @@ const KEY_MAP: Record<string, PadButton> = {
   "]": "rt",
   Tab: "select",
   F1: "start",
+  F2: "rs",
   Home: "guide",
 };
+
+interface HoldState {
+  button: "x" | "b";
+  startedAt: number;
+  duration: number;
+  rafId: number;
+  completed: boolean;
+}
+
+let activeHold: HoldState | null = null;
+
+function cancelHold(shouldTapFallback: boolean) {
+  if (!activeHold) return;
+  const { button, startedAt, rafId, completed } = activeHold;
+  cancelAnimationFrame(rafId);
+  activeHold = null;
+  const store = useStore.getState();
+  if (button === "x") store.setHoldXProgress(0);
+  if (button === "b") store.setHoldBProgress(0);
+
+  if (shouldTapFallback && !completed && performance.now() - startedAt < 350) {
+    dispatch(button, false);
+  }
+}
+
+function handlePressWithArbitration(button: PadButton, repeat: boolean) {
+  const store = useStore.getState();
+  const running = store.running;
+  const status = running?.status || (running ? "RUNNING" : "IDLE");
+
+  // R3 toggles the Quick Session Overlay Modal from any screen when a session is active
+  if (button === "rs" && !repeat && running) {
+    store.setSessionOverlayOpen(!store.sessionOverlayOpen);
+    sfx.select();
+    return;
+  }
+
+  // Hold X (800ms) terminates a RUNNING session without colliding with single-tap X
+  if (button === "x" && status === "RUNNING") {
+    if (repeat || activeHold?.button === "x") return;
+    cancelHold(false);
+    const startedAt = performance.now();
+    const duration = 800;
+    const tick = () => {
+      if (!activeHold || activeHold.button !== "x") return;
+      const elapsed = performance.now() - startedAt;
+      const pct = Math.min(100, (elapsed / duration) * 100);
+      useStore.getState().setHoldXProgress(pct);
+      if (pct >= 100) {
+        activeHold.completed = true;
+        cancelHold(false);
+        useStore.getState().setSessionOverlayOpen(false);
+        useStore.getState().stopRunning();
+        return;
+      }
+      activeHold.rafId = requestAnimationFrame(tick);
+    };
+    activeHold = {
+      button: "x",
+      startedAt,
+      duration,
+      rafId: requestAnimationFrame(tick),
+      completed: false,
+    };
+    return;
+  }
+
+  // Hold B (600ms) cancels a STARTING launch without colliding with single-tap B
+  if (button === "b" && status === "STARTING") {
+    if (repeat || activeHold?.button === "b") return;
+    cancelHold(false);
+    const startedAt = performance.now();
+    const duration = 600;
+    const tick = () => {
+      if (!activeHold || activeHold.button !== "b") return;
+      const elapsed = performance.now() - startedAt;
+      const pct = Math.min(100, (elapsed / duration) * 100);
+      useStore.getState().setHoldBProgress(pct);
+      if (pct >= 100) {
+        activeHold.completed = true;
+        cancelHold(false);
+        useStore.getState().stopRunning();
+        return;
+      }
+      activeHold.rafId = requestAnimationFrame(tick);
+    };
+    activeHold = {
+      button: "b",
+      startedAt,
+      duration,
+      rafId: requestAnimationFrame(tick),
+      completed: false,
+    };
+    return;
+  }
+
+  dispatch(button, repeat);
+}
+
+function handleReleaseWithArbitration(button: PadButton) {
+  if (activeHold && activeHold.button === button) {
+    cancelHold(true);
+  }
+}
 
 export function initInputBus() {
   (window as any).__HENOSIS_DISPATCH_PAD = dispatch;
@@ -95,7 +201,11 @@ export function initInputBus() {
   listen<PadEvent>("pad", (ev) => {
     lastInputType = "controller";
     updateCursorVisibility();
-    dispatch(ev.payload.button, ev.payload.repeat);
+    handlePressWithArbitration(ev.payload.button, ev.payload.repeat);
+  }).catch(() => {});
+
+  listen<{ button: PadButton }>("pad-release", (ev) => {
+    handleReleaseWithArbitration(ev.payload.button);
   }).catch(() => {});
 
   listen<{ connected: boolean; name: string }>("pad-connection", (ev) => {
@@ -146,7 +256,14 @@ export function initInputBus() {
     const mapped = KEY_MAP[e.key];
     if (mapped) {
       e.preventDefault();
-      dispatch(mapped, e.repeat);
+      handlePressWithArbitration(mapped, e.repeat);
+    }
+  });
+
+  window.addEventListener("keyup", (e) => {
+    const mapped = KEY_MAP[e.key];
+    if (mapped) {
+      handleReleaseWithArbitration(mapped);
     }
   });
 }

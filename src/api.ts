@@ -213,10 +213,16 @@ export interface Session {
   duration: number;
 }
 
+export type SessionStatus = "IDLE" | "STARTING" | "RUNNING" | "STOPPING" | "ERROR";
+
 export interface RunningGame {
   gameId: number;
   title: string;
   platform: string;
+  runner?: string;
+  cover?: string | null;
+  status?: SessionStatus;
+  statusMessage?: string | null;
   started: number;
 }
 

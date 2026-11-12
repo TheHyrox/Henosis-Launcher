@@ -8,6 +8,8 @@ import { RunningGame } from "./api";
 import { FileBrowserModal } from "./components/FileBrowserModal";
 import { OnScreenKeyboard } from "./components/OnScreenKeyboard";
 import { QuickMenuModal } from "./components/QuickMenuModal";
+import { SessionDock } from "./components/SessionDock";
+import { SessionOverlayModal } from "./components/SessionOverlayModal";
 import { TopBar } from "./components/TopBar";
 import { initInputBus, usePad } from "./input";
 import { useStore } from "./store";
@@ -20,10 +22,11 @@ export const App: React.FC = () => {
   const {
     screen,
     running,
-    stopRunning,
     init,
     refreshOverview,
     setRunning,
+    setSessionError,
+    setSessionOverlayOpen,
     setScanProgress,
     setQuickMenu,
     goHome,
@@ -82,6 +85,10 @@ export const App: React.FC = () => {
         setScanProgress(`${ev.payload.phase.toUpperCase()}: ${ev.payload.current} (${ev.payload.count})`);
       }),
       listen<RunningGame>("game-started", (ev) => {
+        setSessionError(null);
+        setRunning(ev.payload);
+      }),
+      listen<RunningGame>("session-state", (ev) => {
         setRunning(ev.payload);
       }),
       listen<{
@@ -99,9 +106,23 @@ export const App: React.FC = () => {
         );
       }),
       listen<{ gameId: number; duration: number; error: string | null }>("game-ended", (ev) => {
+        const prev = useStore.getState().running;
         setRunning(null);
+        setSessionOverlayOpen(false);
         refreshOverview();
         if (ev.payload.error) {
+          const msg = ev.payload.error.split("\n")[0] || ev.payload.error;
+          setSessionError({
+            gameId: ev.payload.gameId,
+            title: prev?.title || "Game Session",
+            message: msg,
+          });
+          setTimeout(() => {
+            const cur = useStore.getState().sessionError;
+            if (cur && cur.gameId === ev.payload.gameId) {
+              setSessionError(null);
+            }
+          }, 9000);
           pushToast(ev.payload.error, "error");
         }
       }),
@@ -146,25 +167,13 @@ export const App: React.FC = () => {
         {screen.kind === "settings" && <SettingsView initialSection={screen.section} />}
       </div>
 
+      <SessionDock />
+      <div id="henosis-footer-slot" className="henosis-footer-slot" />
+
       <QuickMenuModal />
+      <SessionOverlayModal />
       <FileBrowserModal />
       <OnScreenKeyboard />
-
-      {running && (
-        <div className="launch-overlay">
-          <div className="launch-overlay-card">
-            <div className="launch-spinner-ring" />
-            <span className="launch-eyebrow">STARTING GAME SESSION</span>
-            <h2>{running.title}</h2>
-            <p>
-              Preparing emulator & applying per-game configuration… The launcher will stay in front until the game window is ready.
-            </p>
-            <button className="btn-danger-ghost" onClick={stopRunning}>
-              Cancel / Stop
-            </button>
-          </div>
-        </div>
-      )}
 
       {toasts.length > 0 && (
         <div className="toast-stack">

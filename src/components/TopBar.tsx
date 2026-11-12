@@ -7,6 +7,7 @@
 // - Bottom Action Bar Right: Session analytics ticker (PLAYTIME: Xh, Battery / Status).
 
 import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { api } from "../api";
 import { onPadStatus } from "../input";
 import { useStore } from "../store";
@@ -178,9 +179,19 @@ export const TopBar: React.FC = () => {
 
       <div className="topbar-center">
         {running && (
-          <div className="running-banner" onClick={() => setQuickMenu(true)}>
+          <div
+            className="running-banner"
+            onClick={() => useStore.getState().setSessionOverlayOpen(true)}
+            title="Open Session Menu (R3)"
+          >
             <span className="pulse-dot" />
-            <span>Now Playing: {running.title}</span>
+            <span>
+              {running.status === "STARTING"
+                ? `Starting: ${running.title}`
+                : running.status === "STOPPING"
+                  ? `Stopping: ${running.title}`
+                  : `Now Playing: ${running.title}`}
+            </span>
           </div>
         )}
         {scanning && (
@@ -240,8 +251,17 @@ export const TopBar: React.FC = () => {
 
 export const BottomPromptBar: React.FC<{ items: PromptItem[] }> = ({ items }) => {
   const { totalPlaytimeSeconds, running } = useStore();
+  const [slot, setSlot] = useState<HTMLElement | null>(() =>
+    typeof document !== "undefined" ? document.getElementById("henosis-footer-slot") : null
+  );
 
-  return (
+  useEffect(() => {
+    if (!slot) {
+      setSlot(document.getElementById("henosis-footer-slot"));
+    }
+  }, [slot]);
+
+  const content = (
     <footer className="promptbar">
       <div className="promptbar-list">
         {items.map((it, idx) => {
@@ -278,4 +298,6 @@ export const BottomPromptBar: React.FC<{ items: PromptItem[] }> = ({ items }) =>
       </div>
     </footer>
   );
+
+  return slot ? createPortal(content, slot) : content;
 };
