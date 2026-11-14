@@ -6,7 +6,9 @@
 //! 3. Optional IGDB API (via Twitch Client-ID + Client-Secret) for rich retro/emulated synopses,
 //!    developers, publishers, genres, and release years.
 
+use std::collections::HashMap;
 use std::process::Command;
+use std::sync::OnceLock;
 
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
@@ -381,68 +383,73 @@ pub fn search_candidates(
 
     let mut out: Vec<MetadataCandidate> = Vec::new();
 
-    // 1. Libretro CDN exact/regional matches for the game's platform
-    if let Some(sys) = libretro_system_name(&game.platform) {
-        let sys_enc = url_encode_path(sys);
-        let base = libretro_sanitize(&q);
-        let variants = [
-            (q.clone(), base.clone(), game.region.clone()),
-            (q.clone(), format!("{base} (USA)"), Some("USA".into())),
-            (q.clone(), format!("{base} (Europe)"), Some("Europe".into())),
-            (q.clone(), format!("{base} (World)"), Some("World".into())),
-            (q.clone(), format!("{base} (Japan)"), Some("Japan".into())),
-        ];
-        let mut seen_urls = std::collections::HashSet::new();
-        for (disp_title, cand_name, reg) in variants {
-            let box_url = format!(
-                "https://thumbnails.libretro.com/{sys_enc}/Named_Boxarts/{}.png",
-                url_encode_path(&cand_name)
-            );
-            if seen_urls.contains(&box_url) {
-                continue;
-            }
-            if curl_head_ok(&box_url) {
-                seen_urls.insert(box_url.clone());
-                let snap_url = format!(
-                    "https://thumbnails.libretro.com/{sys_enc}/Named_Snaps/{}.png",
-                    url_encode_path(&cand_name)
-                );
-                let logo_url = format!(
-                    "https://thumbnails.libretro.com/{sys_enc}/Named_Titles/{}.png",
-                    url_encode_path(&cand_name)
-                );
-                out.push(MetadataCandidate {
-                    source: "libretro".into(),
-                    title: disp_title,
-                    release_date: None,
-                    developer: None,
-                    publisher: None,
-                    genre: None,
-                    description: Some(format!("Official Libretro Thumbnail Boxart match ({cand_name})")),
-                    cover: Some(box_url),
-                    hero: curl_head_ok(&snap_url).then_some(snap_url),
-                    logo: curl_head_ok(&logo_url).then_some(logo_url),
-                    region: reg,
-                    serial: game.serial.clone(),
-                    steam_app_id: None,
-                });
-                if out.len() >= 2 {
-                    break;
-                }
-            }
-        }
-    }
-
-    // 2. IGDB Search (when configured)
+    // 1. IGDB Search first (when configured) for rich game metadata
     if let Some(creds) = igdb_creds.filter(|c| !c.client_id.trim().is_empty() && !c.client_secret.trim().is_empty()) {
         if let Some(mut igdb_list) = query_igdb(db, &creds, &q, 6) {
             out.append(&mut igdb_list);
         }
     }
 
-    // 3. Steam Store Search (works with zero API keys for any game)
+    // 2. Steam Store Search (works with zero API keys for any game)
     let mut steam_list = search_steam_candidates(&q, 5);
     out.append(&mut steam_list);
+
+    // 3. Libretro CDN fuzzy/accent-insensitive search against platform Named_Boxarts index
+    if let Some(sys) = libretro_system_name(&game.platform) {
+        let mut lr_list = search_libretro_candidates(sys, &q, game.serial.as_deref(), 12);
+        if lr_list.is_empty() {
+            // Fallback to direct HEAD probes if directory listing failed
+            let sys_enc = url_encode_path(sys);
+            let base = libretro_sanitize(&q);
+            let variants = [
+                (q.clone(), base.clone(), game.region.clone()),
+                (q.clone(), format!("{base} (USA)"), Some("USA".into())),
+                (q.clone(), format!("{base} (Europe)"), Some("Europe".into())),
+                (q.clone(), format!("{base} (World)"), Some("World".into())),
+                (q.clone(), format!("{base} (Japan)"), Some("Japan".into())),
+            ];
+            let mut seen_urls = std::collections::HashSet::new();
+            for (disp_title, cand_name, reg) in variants {
+                let box_url = format!(
+                    "https://thumbnails.libretro.com/{sys_enc}/Named_Boxarts/{}.png",
+                    url_encode_path(&cand_name)
+                );
+                if seen_urls.contains(&box_url) {
+                    continue;
+                }
+                if curl_head_ok(&box_url) {
+                    seen_urls.insert(box_url.clone());
+                    let snap_url = format!(
+                        "https://thumbnails.libretro.com/{sys_enc}/Named_Snaps/{}.png",
+                        url_encode_path(&cand_name)
+                    );
+                    let logo_url = format!(
+                        "https://thumbnails.libretro.com/{sys_enc}/Named_Titles/{}.png",
+                        url_encode_path(&cand_name)
+                    );
+                    lr_list.push(MetadataCandidate {
+                        source: "libretro".into(),
+                        title: disp_title,
+                        release_date: None,
+                        developer: None,
+                        publisher: None,
+                        genre: None,
+                        description: Some(format!("Official Libretro Thumbnail Boxart match ({cand_name})")),
+                        cover: Some(box_url),
+                        hero: curl_head_ok(&snap_url).then_some(snap_url),
+                        logo: curl_head_ok(&logo_url).then_some(logo_url),
+                        region: reg,
+                        serial: game.serial.clone(),
+                        steam_app_id: None,
+                    });
+                    if lr_list.len() >= 2 {
+                        break;
+                    }
+                }
+            }
+        }
+        out.append(&mut lr_list);
+    }
 
     // 4. Local Clean Filename candidate (to easily restore from the ROM file name)
     let stem = std::path::Path::new(&game.path)
@@ -959,4 +966,243 @@ fn strip_html(input: &str) -> String {
         .replace("&amp;", "&")
         .replace("&#39;", "'")
         .replace("&nbsp;", " ")
+}
+
+#[derive(Clone)]
+struct LibretroEntry {
+    href: String,
+    stem: String,
+    norm_title: String,
+    region: Option<String>,
+}
+
+static LIBRETRO_INDEX_CACHE: OnceLock<Mutex<HashMap<String, Vec<LibretroEntry>>>> = OnceLock::new();
+
+fn fold_accents_and_normalize(input: &str) -> String {
+    // Strip parenthesized (...) and bracketed [...] tags
+    let mut base = String::with_capacity(input.len());
+    let mut paren_depth = 0u32;
+    let mut bracket_depth = 0u32;
+    for ch in input.chars() {
+        match ch {
+            '(' => paren_depth += 1,
+            ')' => paren_depth = paren_depth.saturating_sub(1),
+            '[' => bracket_depth += 1,
+            ']' => bracket_depth = bracket_depth.saturating_sub(1),
+            _ if paren_depth == 0 && bracket_depth == 0 => base.push(ch),
+            _ => {}
+        }
+    }
+
+    let mut out = String::with_capacity(base.len());
+    let mut prev_space = true;
+    for ch in base.chars() {
+        let folded = match ch {
+            'á' | 'à' | 'â' | 'ä' | 'ã' | 'å' | 'Á' | 'À' | 'Â' | 'Ä' | 'Ã' | 'Å' => 'a',
+            'é' | 'è' | 'ê' | 'ë' | 'É' | 'È' | 'Ê' | 'Ë' => 'e',
+            'í' | 'ì' | 'î' | 'ï' | 'Í' | 'Ì' | 'Î' | 'Ï' => 'i',
+            'ó' | 'ò' | 'ô' | 'ö' | 'õ' | 'Ó' | 'Ò' | 'Ô' | 'Ö' | 'Õ' => 'o',
+            'ú' | 'ù' | 'û' | 'ü' | 'Ú' | 'Ù' | 'Û' | 'Ü' => 'u',
+            'ç' | 'Ç' => 'c',
+            'ñ' | 'Ñ' => 'n',
+            'ý' | 'ÿ' | 'Ý' => 'y',
+            c if c.is_ascii_alphanumeric() => c.to_ascii_lowercase(),
+            _ => ' ',
+        };
+        if folded == ' ' {
+            if !prev_space {
+                out.push(' ');
+                prev_space = true;
+            }
+        } else {
+            out.push(folded);
+            prev_space = false;
+        }
+    }
+    out.trim().to_string()
+}
+
+fn extract_libretro_region(stem: &str) -> Option<String> {
+    let start = stem.find('(')?;
+    let rest = &stem[start + 1..];
+    let end = rest.find(')')?;
+    let tag = rest[..end].trim();
+    if tag.is_empty() {
+        None
+    } else {
+        Some(tag.to_string())
+    }
+}
+
+fn get_libretro_index(sys: &str) -> Vec<LibretroEntry> {
+    let cache = LIBRETRO_INDEX_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    if let Some(existing) = cache.lock().get(sys) {
+        return existing.clone();
+    }
+
+    let sys_enc = url_encode_path(sys);
+    let url = format!("https://thumbnails.libretro.com/{sys_enc}/Named_Boxarts/");
+    let output = match Command::new("curl")
+        .args(["-sSL", "--max-time", "12", &url])
+        .output()
+    {
+        Ok(o) if o.status.success() => o,
+        _ => return Vec::new(),
+    };
+
+    let html = String::from_utf8_lossy(&output.stdout);
+    let mut entries = Vec::new();
+    let mut cursor = html.as_ref();
+
+    while let Some(href_pos) = cursor.find("<a href=\"") {
+        let after_attr = &cursor[href_pos + 9..];
+        let Some(quote_end) = after_attr.find('"') else {
+            break;
+        };
+        let href = &after_attr[..quote_end];
+        let after_quote = &after_attr[quote_end + 1..];
+        let Some(tag_end) = after_quote.find('>') else {
+            break;
+        };
+        let after_tag = &after_quote[tag_end + 1..];
+        let Some(close_pos) = after_tag.find("</a>") else {
+            break;
+        };
+        let raw_text = &after_tag[..close_pos];
+        cursor = &after_tag[close_pos + 4..];
+
+        if !href.to_ascii_lowercase().ends_with(".png") {
+            continue;
+        }
+        let decoded_text = raw_text
+            .replace("&amp;", "&")
+            .replace("&quot;", "\"")
+            .replace("&#39;", "'");
+        let stem = decoded_text
+            .strip_suffix(".png")
+            .or_else(|| decoded_text.strip_suffix(".PNG"))
+            .unwrap_or(&decoded_text)
+            .trim()
+            .to_string();
+        if stem.is_empty() {
+            continue;
+        }
+
+        let norm_title = fold_accents_and_normalize(&stem);
+        if norm_title.is_empty() {
+            continue;
+        }
+
+        entries.push(LibretroEntry {
+            href: href.to_string(),
+            region: extract_libretro_region(&stem),
+            stem,
+            norm_title,
+        });
+    }
+
+    if !entries.is_empty() {
+        cache.lock().insert(sys.to_string(), entries.clone());
+    }
+    entries
+}
+
+fn search_libretro_candidates(
+    sys: &str,
+    query: &str,
+    serial: Option<&str>,
+    limit: usize,
+) -> Vec<MetadataCandidate> {
+    let norm_q = fold_accents_and_normalize(query);
+    if norm_q.is_empty() {
+        return Vec::new();
+    }
+    let tokens: Vec<&str> = norm_q.split_whitespace().collect();
+    if tokens.is_empty() {
+        return Vec::new();
+    }
+
+    let entries = get_libretro_index(sys);
+    if entries.is_empty() {
+        return Vec::new();
+    }
+
+    let mut scored: Vec<(i32, &LibretroEntry)> = Vec::new();
+    for entry in &entries {
+        let mut score = if entry.norm_title == norm_q {
+            1000
+        } else if entry.norm_title.starts_with(&norm_q) {
+            850 - (entry.norm_title.len() as i32 - norm_q.len() as i32).min(200)
+        } else if entry.norm_title.contains(&norm_q) {
+            700 - (entry.norm_title.len() as i32 - norm_q.len() as i32).min(200)
+        } else {
+            let matched = tokens.iter().filter(|t| entry.norm_title.contains(*t)).count();
+            if matched == tokens.len() {
+                550 - (entry.norm_title.len() as i32 - norm_q.len() as i32).abs().min(200)
+            } else if tokens.len() >= 2 && matched + 1 >= tokens.len() {
+                250 + (matched as i32 * 40) - (entry.norm_title.len() as i32).min(100)
+            } else {
+                continue;
+            }
+        };
+
+        // Prefer clean retail regions (USA / Europe / France / World) over beta/hack/bad dumps
+        if let Some(reg) = entry.region.as_deref() {
+            if reg.contains("USA") || reg.contains("Europe") || reg.contains("World") {
+                score += 30;
+            } else if reg.contains("France") {
+                score += 25;
+            }
+        }
+        if entry.stem.contains("[b]") || entry.stem.contains("(Beta") || entry.stem.contains("(Proto") {
+            score -= 120;
+        }
+
+        scored.push((score, entry));
+    }
+
+    scored.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.stem.cmp(&b.1.stem)));
+
+    let sys_enc = url_encode_path(sys);
+    scored
+        .into_iter()
+        .take(limit)
+        .map(|(_, entry)| {
+            let box_url = format!(
+                "https://thumbnails.libretro.com/{sys_enc}/Named_Boxarts/{}",
+                entry.href
+            );
+            let snap_url = format!(
+                "https://thumbnails.libretro.com/{sys_enc}/Named_Snaps/{}",
+                entry.href
+            );
+            let logo_url = format!(
+                "https://thumbnails.libretro.com/{sys_enc}/Named_Titles/{}",
+                entry.href
+            );
+            let clean_disp = entry
+                .stem
+                .split('(')
+                .next()
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| entry.stem.clone());
+
+            MetadataCandidate {
+                source: "libretro".into(),
+                title: clean_disp,
+                release_date: None,
+                developer: None,
+                publisher: None,
+                genre: None,
+                description: Some(format!("Libretro Boxart: {}", entry.stem)),
+                cover: Some(box_url),
+                hero: Some(snap_url),
+                logo: Some(logo_url),
+                region: entry.region.clone(),
+                serial: serial.map(|s| s.to_string()),
+                steam_app_id: None,
+            }
+        })
+        .collect()
 }

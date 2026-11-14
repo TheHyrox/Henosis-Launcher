@@ -17,6 +17,7 @@ import {
   Platform,
 } from "../api";
 import { CollectibleCard } from "../components/Collectible";
+import { CoverFlow3D } from "../components/CoverFlow3D";
 import { ConsoleEnvironment } from "../components/ConsoleEnvironment";
 import { BottomPromptBar } from "../components/TopBar";
 import { usePad } from "../input";
@@ -586,83 +587,14 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
               {/* Dynamic Floor Reflection: blurred mirror plane simulating showroom glass pedestal */}
               <div className="coverflow-glass-floor" />
 
-              {visibleGames.map((g, idx) => {
-                const offset = idx - focusIdx;
-                if (Math.abs(offset) > 5) return null;
-
-                const isCenter = offset === 0;
-                const absOffset = Math.abs(offset);
-
-                // Active Hero State: elevated vertically, front-facing with 0deg Y-rotation
-                // Flanking titles: folded inward at 45° angles displaying their 3D spines
-                let transform = "";
-                let zIndex = 50 - absOffset;
-                let opacity = 1;
-
-                if (isCenter) {
-                  transform = `translateX(0px) translateY(-28px) translateZ(170px) rotateY(0deg) scale(1.42)`;
-                  zIndex = 100;
-                  opacity = 1;
-                } else if (offset < 0) {
-                  const spacing = 240 + (absOffset - 1) * 115;
-                  const depth = -80 - (absOffset - 1) * 55;
-                  transform = `translateX(-${spacing}px) translateY(0px) translateZ(${depth}px) rotateY(45deg) scale(1.08)`;
-                  opacity = Math.max(0.42, 1 - absOffset * 0.14);
-                } else {
-                  const spacing = 240 + (absOffset - 1) * 115;
-                  const depth = -80 - (absOffset - 1) * 55;
-                  transform = `translateX(${spacing}px) translateY(0px) translateZ(${depth}px) rotateY(-45deg) scale(1.08)`;
-                  opacity = Math.max(0.42, 1 - absOffset * 0.14);
-                }
-
-                return (
-                  <div
-                    key={g.id}
-                    className={`coverflow-item ${isCenter ? "is-center" : "is-side"}`}
-                    style={{
-                      transform,
-                      zIndex,
-                      opacity,
-                    }}
-                    onClick={() => {
-                      if (isCenter) {
-                        navigate({ kind: "game", gameId: g.id });
-                      } else {
-                        setPlatformFocus(platformId, idx);
-                      }
-                    }}
-                    onDoubleClick={() => launchGame(g.id)}
-                  >
-                    <CollectibleCard
-                      game={g}
-                      platform={platform}
-                      focused={isCenter}
-                      size="coverflow"
-                    />
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Carousel navigation indicators */}
-            <div className="coverflow-nav-indicator">
-              <span
-                className="nav-arrow"
-                onClick={() => setPlatformFocus(platformId, Math.max(0, focusIdx - 1))}
-              >
-                ◀
-              </span>
-              <span className="nav-counter">
-                {focusIdx + 1} / {visibleGames.length} · --- Floor Reflection ---
-              </span>
-              <span
-                className="nav-arrow"
-                onClick={() =>
-                  setPlatformFocus(platformId, Math.min(visibleGames.length - 1, focusIdx + 1))
-                }
-              >
-                ▶
-              </span>
+              <CoverFlow3D
+                games={visibleGames}
+                platform={platform}
+                focusIdx={focusIdx}
+                onFocusChange={(idx) => setPlatformFocus(platformId, idx)}
+                onSelectGame={(g) => navigate({ kind: "game", gameId: g.id })}
+                onLaunchGame={(g) => launchGame(g.id)}
+              />
             </div>
           </section>
 

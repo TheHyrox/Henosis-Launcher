@@ -211,7 +211,8 @@ function handlePressWithArbitration(button: PadButton, repeat: boolean) {
 
 function handleReleaseWithArbitration(button: PadButton) {
   if (activeHold && activeHold.button === button) {
-    cancelHold(true);
+    // Do not fall back to tap-X when a game is running so "Hold X to Stop" never triggers "X Rescan".
+    cancelHold(button === "b");
   }
 }
 

@@ -420,6 +420,7 @@ export const api = {
   saveAppSettings: (settings: AppSettings) => invoke<void>("save_app_settings", { settings }),
   hideWindow: () => invoke<void>("hide_window"),
   quitApp: () => invoke<void>("quit_app"),
+  fetchImageDataUrl: (url: string) => invoke<string>("fetch_image_data_url", { url }),
 };
 
 /** Compute accessible high-contrast foreground text color (#0b0e17 vs #ffffff) for any background hex */

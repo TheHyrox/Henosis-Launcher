@@ -2894,6 +2894,8 @@ code {
 
 /* Base 3D Case Box */
 .case-3d-box {
+  --case-d: 18px;
+  --case-half-d: 9px;
   position: relative;
   width: 184px;
   height: 254px;
@@ -2907,11 +2909,56 @@ code {
   inset: 0;
   border-radius: 7px;
   overflow: hidden;
-  transform: translateZ(9px);
-  background: #0d111d;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24);
+  transform: translateZ(var(--case-half-d, 9px));
+  background: #141923;
+  box-shadow:
+    inset 0 0 0 1.5px rgba(255, 255, 255, 0.28),
+    inset 0 2px 6px rgba(255, 255, 255, 0.14);
+  padding: 3px;
   display: flex;
   flex-direction: column;
+}
+
+.case-paper-sleeve {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: #0b0f19;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55);
+}
+
+.case-clasp {
+  position: absolute;
+  right: 0;
+  width: 4px;
+  height: 28px;
+  border-radius: 2px 0 0 2px;
+  background: rgba(255, 255, 255, 0.24);
+  box-shadow: inset 1px 0 2px rgba(0, 0, 0, 0.45);
+  z-index: 6;
+  pointer-events: none;
+}
+
+.case-clasp-top {
+  top: 24%;
+}
+
+.case-clasp-bottom {
+  bottom: 24%;
+}
+
+/* Back Molded Plastic Face */
+.case-face-back {
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+  transform: translateZ(calc(-1 * var(--case-half-d, 9px))) rotateY(180deg);
+  background: #090c14;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
 /* Clear transparent plastic sleeve wrap with glossy reflection */
@@ -3087,9 +3134,9 @@ code {
   top: 0;
   bottom: 0;
   left: 0;
-  width: 18px;
+  width: var(--case-d, 18px);
   transform-origin: left center;
-  transform: rotateY(-90deg);
+  transform: translateZ(calc(-1 * var(--case-half-d, 9px))) rotateY(-90deg);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -3133,9 +3180,9 @@ code {
   top: 0;
   left: 0;
   right: 0;
-  height: 18px;
+  height: var(--case-d, 18px);
   transform-origin: top center;
-  transform: rotateX(90deg);
+  transform: translateZ(calc(-1 * var(--case-half-d, 9px))) rotateX(90deg);
   border-radius: 3px 3px 0 0;
   box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.4);
 }
@@ -3143,7 +3190,7 @@ code {
 .top-plastic-seam {
   width: 100%;
   height: 1px;
-  margin-top: 8px;
+  margin-top: calc(var(--case-half-d, 9px) - 1px);
   background: rgba(255, 255, 255, 0.15);
 }
 
@@ -3152,9 +3199,9 @@ code {
   top: 0;
   bottom: 0;
   right: 0;
-  width: 18px;
+  width: var(--case-d, 18px);
   transform-origin: right center;
-  transform: rotateY(90deg);
+  transform: translateZ(calc(-1 * var(--case-half-d, 9px))) rotateY(90deg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3173,31 +3220,67 @@ code {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 18px;
+  height: var(--case-d, 18px);
   transform-origin: bottom center;
-  transform: rotateX(-90deg);
+  transform: translateZ(calc(-1 * var(--case-half-d, 9px))) rotateX(-90deg);
   background: #090c14;
 }
 
 /* Specific Console Plastic Case Types */
 
-/* Switch: Translucent Scarlet Red Case */
-.case-type-switch .case-face-front {
-  border-color: #e60012;
-  box-shadow: 0 0 12px rgba(230, 0, 18, 0.25), inset 0 0 0 1.5px rgba(255, 80, 80, 0.4);
+/* Switch: Translucent Clear/Scarlet Red Case */
+.case-type-switch .case-3d-box {
+  --case-d: 14px;
+  --case-half-d: 7px;
 }
-.case-type-switch .case-top-banner {
-  background: #e60012;
+.case-type-switch .case-face-front {
+  background: rgba(230, 0, 18, 0.35);
+  border: 2px solid rgba(230, 0, 18, 0.8);
+  box-shadow: 0 0 14px rgba(230, 0, 18, 0.28), inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);
+}
+.case-type-switch .case-face-back {
+  background: rgba(180, 0, 14, 0.85);
 }
 .case-type-switch .case-face-spine {
-  background: linear-gradient(180deg, #d80010, #b0000d);
+  background: linear-gradient(180deg, #e60012, #b8000e);
   border-right: 1px solid rgba(255, 255, 255, 0.3);
 }
 .case-type-switch .case-face-top {
-  background: rgba(230, 0, 18, 0.85);
+  background: rgba(220, 0, 18, 0.78);
 }
 .case-type-switch .case-face-right {
-  background: rgba(230, 0, 18, 0.75);
+  background: rgba(210, 0, 16, 0.68);
+}
+.case-type-switch .case-face-bottom {
+  background: rgba(160, 0, 12, 0.85);
+}
+
+.case-switch-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 34px;
+  height: 36px;
+  border-radius: 3px;
+  background: #e60012;
+  color: #ffffff;
+  font-size: 0.42rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+}
+
+.switch-joycon-icon {
+  width: 16px;
+  height: 16px;
 }
 
 /* Wii U: Translucent Vibrant Cyan Amaray Case */
@@ -4469,20 +4552,137 @@ body,
   color: #fff;
 }
 
-.physical-3d-item.case-type-nds .case-face-front,
+/* Nintendo DS: Thick Translucent Charcoal Plastic Case + Left White Strip */
+.physical-3d-item.case-type-nds .case-3d-box {
+  --case-d: 20px;
+  --case-half-d: 10px;
+}
+
+.physical-3d-item.case-type-nds .case-face-front {
+  background: #2a313d;
+  border: 2.5px solid #3b4454;
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+
+.physical-3d-item.case-type-nds .case-face-back,
+.physical-3d-item.case-type-nds .case-face-bottom {
+  background: #1a1e26;
+}
+
+.physical-3d-item.case-type-nds .case-face-spine {
+  background: linear-gradient(180deg, #2d3340, #1b1f28);
+  color: #e2e8f0;
+}
+
+.physical-3d-item.case-type-nds .case-face-top,
+.physical-3d-item.case-type-nds .case-face-right {
+  background: #232833;
+}
+
+.case-nds-layout {
+  display: flex;
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.case-nds-sidebar {
+  width: 22px;
+  flex-shrink: 0;
+  background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
+  color: #475569;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 2px;
+  border-right: 1.5px solid #cbd5e1;
+  z-index: 2;
+}
+
+.nds-blue {
+  font-style: normal;
+  color: #0284c7;
+}
+
+.case-nds-squares {
+  font-size: 0.72rem;
+  line-height: 1;
+  color: #334155;
+}
+
+.case-nds-sidebar-text {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 0.5rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+/* Nintendo 3DS: Frosted White Plastic Case + Right Red/White Strip */
+.physical-3d-item.case-type-3ds .case-3d-box {
+  --case-d: 18px;
+  --case-half-d: 9px;
+}
+
 .physical-3d-item.case-type-3ds .case-face-front {
-  border: 2px solid rgba(255, 255, 255, 0.22);
-  box-shadow: inset 0 0 18px rgba(255, 255, 255, 0.14);
+  background: #e2e8f0;
+  border: 2.5px solid #f8fafc;
+  box-shadow: inset 0 0 12px rgba(255, 255, 255, 0.35), 0 0 14px rgba(255, 255, 255, 0.14);
 }
 
-.physical-3d-item.case-type-nds .case-top-banner {
-  background: linear-gradient(90deg, #1b2234 0%, #2d3748 100%);
-  color: #fff;
+.physical-3d-item.case-type-3ds .case-face-back,
+.physical-3d-item.case-type-3ds .case-face-bottom {
+  background: #cbd5e1;
 }
 
-.physical-3d-item.case-type-3ds .case-top-banner {
-  background: linear-gradient(90deg, #FF3D55 0%, #d91b38 100%);
-  color: #fff;
+.physical-3d-item.case-type-3ds .case-face-spine {
+  background: linear-gradient(180deg, #f8fafc, #e2e8f0);
+  color: #0f172a;
+  border-right: 1px solid rgba(15, 23, 42, 0.18);
+}
+
+.physical-3d-item.case-type-3ds .case-face-top,
+.physical-3d-item.case-type-3ds .case-face-right {
+  background: #e2e8f0;
+}
+
+.case-3ds-layout {
+  display: flex;
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.case-3ds-sidebar {
+  width: 22px;
+  flex-shrink: 0;
+  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+  color: #111827;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-left: 1.5px solid rgba(0, 0, 0, 0.18);
+  z-index: 2;
+}
+
+.case-3ds-red-tab {
+  width: 100%;
+  height: 28px;
+  background: linear-gradient(180deg, #e60012 0%, #c8102e 100%);
+}
+
+.case-3ds-sidebar-text {
+  writing-mode: vertical-rl;
+  font-size: 0.48rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: #1e293b;
 }
 
 .btn-view-toggle {
@@ -4552,7 +4752,7 @@ body,
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 14px 10px;
+  padding: 22px 22px 26px;
   scrollbar-width: thin;
 }
 
@@ -4571,6 +4771,7 @@ body,
   border: 1px solid rgba(255, 255, 255, 0.08);
   overflow: hidden;
   cursor: pointer;
+  scroll-margin: 26px;
   transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1), border-color 200ms ease, box-shadow 200ms ease;
 }
 
@@ -4586,9 +4787,9 @@ body,
   aspect-ratio: 2 / 3;
 }
 
-/* Cursor Focus Ring: Glowing 3px border in platform accent color, scale(1.08) */
+/* Cursor Focus Ring: Glowing 3px border in platform accent color, scale(1.06) */
 .poster-wall-card.is-focused {
-  transform: scale(1.08);
+  transform: scale(1.06);
   border: 3px solid var(--theme-accent, #FF3D55);
   box-shadow:
     0 14px 32px rgba(0, 0, 0, 0.75),
@@ -4606,7 +4807,7 @@ body,
 .poster-card-art img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
 }
 
@@ -5456,10 +5657,10 @@ body,
 /* ── Metadata & Artwork Link Manager Modal ── */
 
 .meta-fixer-modal {
-  width: 880px;
-  max-width: 94vw;
-  max-height: 86vh;
-  padding: 22px 28px;
+  width: 1080px;
+  max-width: 95vw;
+  max-height: 90vh;
+  padding: 24px 30px;
   border-radius: 20px;
   background: rgba(14, 19, 30, 0.97);
   backdrop-filter: blur(28px);
@@ -5701,6 +5902,74 @@ body,
 
 .meta-candidate-cta {
   flex-shrink: 0;
+}
+
+.meta-artwork-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  overflow-y: auto;
+  padding: 4px 2px 10px;
+}
+
+.meta-artwork-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(22, 30, 46, 0.72);
+  border: 1.5px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.meta-artwork-card:hover,
+.meta-artwork-card.is-focused {
+  border-color: var(--theme-accent);
+  background: rgba(30, 41, 62, 0.92);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  transform: translateY(-2px);
+}
+
+.meta-artwork-thumb {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #090c14;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.meta-artwork-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.meta-artwork-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.meta-artwork-footer strong {
+  font-size: 0.84rem;
+  font-weight: 800;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meta-artwork-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 

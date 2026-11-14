@@ -29,6 +29,7 @@ export const HomeView: React.FC = () => {
     setQuickMenu,
     openKeyboard,
     pushToast,
+    running,
   } = useStore();
 
   const [makerIdx, setMakerIdx] = useState(0);
@@ -115,7 +116,7 @@ export const HomeView: React.FC = () => {
       navigate({ kind: "platform", platformId: activePlatform.id });
       return true;
     }
-    if (btn === "x") {
+    if (btn === "x" && !running) {
       triggerScan();
       return true;
     }
@@ -327,7 +328,7 @@ export const HomeView: React.FC = () => {
               ? () => navigate({ kind: "platform", platformId: activePlatform.id })
               : undefined,
           },
-          { btn: "X", label: "Rescan", onClick: () => triggerScan() },
+          ...(!running ? [{ btn: "X" as const, label: "Rescan", onClick: () => triggerScan() }] : []),
           {
             btn: "LB/RB",
             label: "Maker Filter",

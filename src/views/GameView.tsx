@@ -185,11 +185,20 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
   const [fetchingMeta, setFetchingMeta] = useState(false);
   const [hotkeyModalOpen, setHotkeyModalOpen] = useState(false);
   const [metaModalOpen, setMetaModalOpen] = useState(false);
-  const [metaMode, setMetaMode] = useState<"search" | "manual">("search");
+  const [metaMode, setMetaMode] = useState<"search" | "artwork" | "manual">("search");
   const [metaSearchQuery, setMetaSearchQuery] = useState("");
   const [metaCandidates, setMetaCandidates] = useState<MetadataCandidate[]>([]);
   const [searchingCandidates, setSearchingCandidates] = useState(false);
   const [metaFocusIdx, setMetaFocusIdx] = useState(0);
+
+  const metadataLinkCandidates = useMemo(
+    () => metaCandidates.filter((c) => c.source !== "libretro"),
+    [metaCandidates]
+  );
+  const libretroArtworkCandidates = useMemo(
+    () => metaCandidates.filter((c) => c.source === "libretro"),
+    [metaCandidates]
+  );
 
   const tab = TABS[tabIdx].id;
 
@@ -574,12 +583,16 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
   const safeSettingIdx = Math.min(settingIdx, Math.max(0, settingRows.length - 1));
 
   useEffect(() => {
+    setSettingIdx(0);
+  }, [gameId]);
+
+  useEffect(() => {
     if (tab !== "settings") return;
     const rowEl = settingRowsRef.current?.querySelector<HTMLElement>(
       `[data-setting-idx="${safeSettingIdx}"]`
     );
     if (rowEl) {
-      rowEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      rowEl.scrollIntoView({ behavior: "instant" as ScrollBehavior, block: "nearest" });
     }
   }, [safeSettingIdx, tab]);
 
@@ -720,6 +733,22 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
     }
   };
 
+  const handleApplyLibretroCover = async (cand: MetadataCandidate) => {
+    if (!game || !cand.cover) return;
+    setSearchingCandidates(true);
+    try {
+      await handlePatchMetadata(
+        {
+          cover: cand.cover,
+        },
+        `Updated cover artwork (${cand.region || "Libretro"})`
+      );
+      setMetaModalOpen(false);
+    } finally {
+      setSearchingCandidates(false);
+    }
+  };
+
   const handleResetMetadata = async (rescrape: boolean) => {
     if (!game) return;
     setSearchingCandidates(true);
@@ -734,7 +763,7 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
           : "Metadata & artwork reset to clean filename",
         "info"
       );
-      if (metaModalOpen && metaMode === "search") {
+      if (metaModalOpen && (metaMode === "search" || metaMode === "artwork")) {
         runCandidateSearch(updated.title);
       }
     } catch (e) {
@@ -1003,15 +1032,20 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
         return true;
       }
       if (btn === "lb" || btn === "rb") {
-        setMetaMode((m) => (m === "search" ? "manual" : "search"));
+        const order: Array<"search" | "artwork" | "manual"> = ["search", "artwork", "manual"];
+        setMetaMode((m) => {
+          const i = order.indexOf(m);
+          const next = btn === "rb" ? (i + 1) % order.length : (i - 1 + order.length) % order.length;
+          return order[next];
+        });
         setMetaFocusIdx(0);
         return true;
       }
       if (metaMode === "search") {
         // Focus items in search mode:
         // 0: Search Query input bar (A opens keyboard to search)
-        // 1..metaCandidates.length: Candidate cards (A applies candidate)
-        const maxIdx = metaCandidates.length;
+        // 1..metadataLinkCandidates.length: Candidate cards (A applies candidate)
+        const maxIdx = metadataLinkCandidates.length;
         if (btn === "up") {
           setMetaFocusIdx((i) => Math.max(0, i - 1));
           return true;
@@ -1044,8 +1078,51 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
               },
             });
           } else {
-            const cand = metaCandidates[metaFocusIdx - 1];
+            const cand = metadataLinkCandidates[metaFocusIdx - 1];
             if (cand) handleApplyCandidate(cand);
+          }
+          return true;
+        }
+      } else if (metaMode === "artwork") {
+        const maxIdx = libretroArtworkCandidates.length;
+        if (btn === "left") {
+          setMetaFocusIdx((i) => Math.max(0, i - 1));
+          return true;
+        }
+        if (btn === "right") {
+          setMetaFocusIdx((i) => Math.min(maxIdx, i + 1));
+          return true;
+        }
+        if (btn === "up") {
+          setMetaFocusIdx((i) => (i <= 4 ? 0 : i - 4));
+          return true;
+        }
+        if (btn === "down") {
+          setMetaFocusIdx((i) => (i === 0 ? Math.min(1, maxIdx) : Math.min(maxIdx, i + 4)));
+          return true;
+        }
+        if (btn === "x") {
+          openKeyboard({
+            title: "Search Libretro Cover Artwork",
+            initial: metaSearchQuery || game?.title || "",
+            onSubmit: (v) => {
+              if (v.trim()) runCandidateSearch(v.trim());
+            },
+          });
+          return true;
+        }
+        if (btn === "a") {
+          if (metaFocusIdx === 0) {
+            openKeyboard({
+              title: "Search Libretro Cover Artwork",
+              initial: metaSearchQuery || game?.title || "",
+              onSubmit: (v) => {
+                if (v.trim()) runCandidateSearch(v.trim());
+              },
+            });
+          } else {
+            const cand = libretroArtworkCandidates[metaFocusIdx - 1];
+            if (cand) handleApplyLibretroCover(cand);
           }
           return true;
         }
@@ -1162,11 +1239,11 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
     if (tab === "settings") {
       const row = settingRows[safeSettingIdx];
       if (btn === "up") {
-        setSettingIdx((i) => Math.max(0, i - 1));
+        setSettingIdx((i) => Math.max(0, Math.min(i, settingRows.length - 1) - 1));
         return true;
       }
       if (btn === "down") {
-        setSettingIdx((i) => Math.min(settingRows.length - 1, i + 1));
+        setSettingIdx((i) => Math.min(Math.max(0, settingRows.length - 1), Math.max(0, i) + 1));
         return true;
       }
       if (btn === "left" && row?.onStep) {
@@ -1812,7 +1889,16 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
                     setMetaFocusIdx(0);
                   }}
                 >
-                  [🔍 Search &amp; Fix Match]
+                  [🔍 Metadata Link]
+                </button>
+                <button
+                  className={`game-tab ${metaMode === "artwork" ? "active" : ""}`}
+                  onClick={() => {
+                    setMetaMode("artwork");
+                    setMetaFocusIdx(0);
+                  }}
+                >
+                  [🖼 Cover Artwork]
                 </button>
                 <button
                   className={`game-tab ${metaMode === "manual" ? "active" : ""}`}
@@ -1821,7 +1907,7 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
                     setMetaFocusIdx(0);
                   }}
                 >
-                  [✎ Manual Fields &amp; Artwork]
+                  [✎ Manual Fields]
                 </button>
                 <span className="pill-hint">RB</span>
               </div>
@@ -1895,14 +1981,14 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
                 <div className="meta-candidates-list">
                   {searchingCandidates ? (
                     <div className="meta-candidates-empty">
-                      ⟳ Querying Libretro Boxart CDN, IGDB &amp; Steam Store for &ldquo;{metaSearchQuery}&rdquo;…
+                      ⟳ Querying IGDB &amp; Steam Store for &ldquo;{metaSearchQuery}&rdquo;…
                     </div>
-                  ) : metaCandidates.length === 0 ? (
+                  ) : metadataLinkCandidates.length === 0 ? (
                     <div className="meta-candidates-empty">
-                      No matches found for &ldquo;{metaSearchQuery}&rdquo;. Try another search query or switch to [Manual Fields &amp; Artwork].
+                      No metadata matches found for &ldquo;{metaSearchQuery}&rdquo;. Try another search query or switch to [Manual Fields].
                     </div>
                   ) : (
-                    metaCandidates.map((cand, idx) => {
+                    metadataLinkCandidates.map((cand, idx) => {
                       const focused = metaFocusIdx === idx + 1;
                       const thumb = mediaSrc(cand.cover) || mediaSrc(cand.hero);
                       return (
@@ -1960,6 +2046,94 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
                     })
                   )}
                 </div>
+              </div>
+            ) : metaMode === "artwork" ? (
+              <div className="meta-search-pane">
+                <div
+                  className={`meta-search-bar ${metaFocusIdx === 0 ? "is-focused" : ""}`}
+                  onMouseEnter={() => setMetaFocusIdx(0)}
+                >
+                  <div className="meta-search-input-wrap">
+                    <span className="meta-search-icon">🖼</span>
+                    <input
+                      type="text"
+                      className="meta-search-input"
+                      value={metaSearchQuery}
+                      placeholder="Search Libretro Boxart covers (e.g. Pokemon Diamond, Mario)…"
+                      onChange={(e) => setMetaSearchQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.stopPropagation();
+                          runCandidateSearch(metaSearchQuery);
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="meta-search-actions">
+                    <button
+                      className="btn-ghost btn-sm"
+                      onClick={() =>
+                        openKeyboard({
+                          title: "Search Libretro Cover Artwork",
+                          initial: metaSearchQuery || game.title,
+                          onSubmit: (v) => {
+                            if (v.trim()) runCandidateSearch(v.trim());
+                          },
+                        })
+                      }
+                    >
+                      <span className="xbox-btn btn-x">X</span>
+                      <span>Keyboard</span>
+                    </button>
+                    <button
+                      className="btn-play-emerald btn-sm"
+                      onClick={() => runCandidateSearch(metaSearchQuery)}
+                      disabled={searchingCandidates}
+                    >
+                      <span>{searchingCandidates ? "Searching…" : "Search Covers"}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {searchingCandidates ? (
+                  <div className="meta-candidates-empty">
+                    ⟳ Querying Libretro Thumbnails Boxart CDN for &ldquo;{metaSearchQuery}&rdquo;…
+                  </div>
+                ) : libretroArtworkCandidates.length === 0 ? (
+                  <div className="meta-candidates-empty">
+                    No Libretro boxart found for &ldquo;{metaSearchQuery}&rdquo;. Try a simpler English title (e.g. &ldquo;Pokemon Black&rdquo;).
+                  </div>
+                ) : (
+                  <div className="meta-artwork-grid">
+                    {libretroArtworkCandidates.map((cand, idx) => {
+                      const focused = metaFocusIdx === idx + 1;
+                      const thumb = mediaSrc(cand.cover);
+                      return (
+                        <div
+                          key={`lr-${cand.cover || cand.title}-${idx}`}
+                          className={`meta-artwork-card ${focused ? "is-focused" : ""}`}
+                          onMouseEnter={() => setMetaFocusIdx(idx + 1)}
+                          onClick={() => handleApplyLibretroCover(cand)}
+                        >
+                          <div className="meta-artwork-thumb">
+                            {thumb ? (
+                              <img src={thumb} alt={cand.title} loading="lazy" />
+                            ) : (
+                              <div className="meta-candidate-noart">No Art</div>
+                            )}
+                          </div>
+                          <div className="meta-artwork-footer">
+                            <strong title={cand.description || cand.title}>{cand.title}</strong>
+                            <div className="meta-artwork-meta">
+                              <span className="meta-source-pill src-libretro">LIBRETRO</span>
+                              {cand.region && <span className="badge-glass">{cand.region}</span>}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="meta-manual-pane">

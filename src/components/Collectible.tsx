@@ -387,20 +387,66 @@ const CollectibleCardComponent: React.FC<CollectibleProps> = ({
                 <div className="case-plastic-sheen-sweep" />
               </div>
 
-              {/* Console Banner on top of the case */}
-              <div className="case-top-banner">
-                <span className="banner-logo-text">{getBannerText()}</span>
-                <span className="banner-notch" />
+              {/* Recessed Printed Paper Insert inside Molded Plastic Shell */}
+              <div className="case-paper-sleeve">
+                {caseType === "case-type-switch" ? (
+                  <>
+                    {/* Authentic Nintendo Switch top-left red corner badge */}
+                    <div className="case-switch-badge" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" className="switch-joycon-icon" fill="currentColor">
+                        <path d="M10.2 2H7.5C4.5 2 2 4.5 2 7.5v9C2 19.5 4.5 22 7.5 22h2.7V2zm-2 11.2a1.6 1.6 0 1 1 0-3.2 1.6 1.6 0 0 1 0 3.2zM16.5 2H13v20h3.5c3 0 5.5-2.5 5.5-5.5v-9C22 4.5 19.5 2 16.5 2zm1.2 14.3a1.7 1.7 0 1 1 0-3.4 1.7 1.7 0 0 1 0 3.4z" />
+                      </svg>
+                      <span>SWITCH</span>
+                    </div>
+                    <div className="case-cover-insert">
+                      <CaseArtwork game={game} platform={platform} />
+                    </div>
+                  </>
+                ) : caseType === "case-type-3ds" ? (
+                  <div className="case-3ds-layout">
+                    <div className="case-cover-insert">
+                      <CaseArtwork game={game} platform={platform} />
+                    </div>
+                    <div className="case-3ds-sidebar">
+                      <span className="case-3ds-red-tab" />
+                      <span className="case-3ds-sidebar-text">NINTENDO 3DS</span>
+                    </div>
+                  </div>
+                ) : caseType === "case-type-nds" ? (
+                  <div className="case-nds-layout">
+                    <div className="case-nds-sidebar">
+                      <span className="case-nds-squares">▪▫</span>
+                      <span className="case-nds-sidebar-text">
+                        NINTENDO <em className="nds-blue">DS</em>
+                      </span>
+                    </div>
+                    <div className="case-cover-insert">
+                      <CaseArtwork game={game} platform={platform} />
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* Console Banner on top of the case */}
+                    <div className="case-top-banner">
+                      <span className="banner-logo-text">{getBannerText()}</span>
+                      <span className="banner-notch" />
+                    </div>
+
+                    {/* Cover Art Insert */}
+                    <div className="case-cover-insert">
+                      <CaseArtwork game={game} platform={platform} />
+                    </div>
+                  </>
+                )}
               </div>
 
-              {/* Cover Art Insert */}
-              <div className="case-cover-insert">
-                <CaseArtwork game={game} platform={platform} />
-              </div>
-
-              {/* Clear thumb-latch indent on the right edge */}
-              <div className="case-latch-indent" />
+              {/* Dual plastic snap clasps / thumb-latch on the right edge */}
+              <div className="case-clasp case-clasp-top" />
+              <div className="case-clasp case-clasp-bottom" />
             </div>
+
+            {/* Back Molded Plastic Shell */}
+            <div className="case-face-back" />
 
             {/* Left 3D Spine Thickness */}
             <div className="case-face-spine">

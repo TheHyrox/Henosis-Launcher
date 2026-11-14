@@ -584,3 +584,63 @@ pub fn get_pad_status(state: State<AppState>) -> crate::gamepad::PadInfo {
 pub fn report_test_state(state: serde_json::Value) {
     crate::test_bridge::set_latest_state(state);
 }
+
+fn encode_base64(bytes: &[u8]) -> String {
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
+        let b0 = chunk[0] as usize;
+        let b1 = if chunk.len() > 1 { chunk[1] as usize } else { 0 };
+        let b2 = if chunk.len() > 2 { chunk[2] as usize } else { 0 };
+        out.push(TABLE[b0 >> 2] as char);
+        out.push(TABLE[((b0 & 0x03) << 4) | (b1 >> 4)] as char);
+        out.push(if chunk.len() > 1 { TABLE[((b1 & 0x0f) << 2) | (b2 >> 6)] as char } else { '=' });
+        out.push(if chunk.len() > 2 { TABLE[b2 & 0x3f] as char } else { '=' });
+    }
+    out
+}
+
+#[tauri::command]
+pub async fn fetch_image_data_url(url: String) -> R<String> {
+    if !url.starts_with("https://") && !url.starts_with("http://") {
+        return Err("Only http/https URLs supported".into());
+    }
+    static IMG_CACHE: std::sync::OnceLock<parking_lot::Mutex<std::collections::HashMap<String, String>>> =
+        std::sync::OnceLock::new();
+    let cache = IMG_CACHE.get_or_init(|| parking_lot::Mutex::new(std::collections::HashMap::new()));
+    if let Some(cached) = cache.lock().get(&url) {
+        return Ok(cached.clone());
+    }
+
+    let url_clone = url.clone();
+    let data_url = tauri::async_runtime::spawn_blocking(move || -> R<String> {
+        let out = std::process::Command::new("curl")
+            .args(["-fsSL", "--max-time", "12", &url_clone])
+            .output()
+            .map_err(e)?;
+        if !out.status.success() || out.stdout.is_empty() {
+            return Err("Image fetch failed".into());
+        }
+        let mime = if out.stdout.starts_with(&[0x89, 0x50, 0x4E, 0x47]) {
+            "image/png"
+        } else if out.stdout.starts_with(&[0xFF, 0xD8, 0xFF]) {
+            "image/jpeg"
+        } else if out.stdout.starts_with(b"RIFF") && out.stdout.len() > 12 && &out.stdout[8..12] == b"WEBP" {
+            "image/webp"
+        } else if url_clone.to_ascii_lowercase().ends_with(".png") {
+            "image/png"
+        } else {
+            "image/jpeg"
+        };
+        Ok(format!("data:{mime};base64,{}", encode_base64(&out.stdout)))
+    })
+    .await
+    .map_err(e)??;
+
+    let mut guard = cache.lock();
+    if guard.len() > 128 {
+        guard.clear();
+    }
+    guard.insert(url, data_url.clone());
+    Ok(data_url)
+}
