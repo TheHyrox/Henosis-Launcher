@@ -12,6 +12,7 @@ pub mod retroachievements;
 pub mod scanner;
 pub mod settings;
 pub mod sfo;
+pub mod steam_achievements;
 pub mod vdf;
 pub mod window;
 pub mod test_bridge;
@@ -166,6 +167,7 @@ pub fn run() {
             commands::test_ra_credentials,
             commands::ra_login,
             commands::get_ra_achievements,
+            commands::get_steam_achievements,
             commands::search_ra_games,
             commands::apply_ra_match,
             commands::unlink_ra_game,

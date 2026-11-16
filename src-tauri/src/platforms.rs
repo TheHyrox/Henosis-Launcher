@@ -105,7 +105,7 @@ pub static PLATFORMS: &[Platform] = &[
     p!("switch", "Nintendo Switch", "Switch", "Nintendo", 2017, Card, CardSwitch,
        ["nsp", "xci", "nsz", "xcz"], ["switch", "nsw", "nintendoswitch", "ns"], "#e60012", "#00c3e3"),
     p!("switch2", "Nintendo Switch 2", "Switch 2", "Nintendo", 2025, Card, CardSwitch,
-       [], ["switch2", "ns2", "nintendoswitch2"], "#2b2b2b", "#e60012"),
+       ["nup"], ["switch2", "ns2", "nintendoswitch2"], "#2b2b2b", "#e60012"),
     p!("virtualboy", "Virtual Boy", "Virtual Boy", "Nintendo", 1995, Cartridge, CartGeneric,
        ["vb"], ["virtualboy", "vb"], "#5a0000", "#ff2a2a"),
     // ── Sony ──────────────────────────────────────────────────────────────
@@ -218,7 +218,7 @@ pub fn accepts_extension(platform: &Platform, ext: &str) -> bool {
         "segacd" | "saturn" | "pcenginecd" | "3do" => &["cue", "chd", "iso", "m3u", "ccd", "mds"],
         "dreamcast" => &["chd", "m3u", "cue"],
         "xbox" | "xbox360" => &["iso"],
-        "switch2" => &["nsp", "xci", "nsz", "xcz"],
+        "switch2" => &["nsp", "xci", "nsz", "xcz", "nup"],
         "arcade" | "neogeo" => &["zip", "7z", "chd"],
         "megadrive" | "mastersystem" | "gamegear" | "sega32x" => &["bin", "zip", "7z"],
         "msx" => &["rom", "dsk", "zip"],

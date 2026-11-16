@@ -13,6 +13,7 @@ const SKIP_DIRS: &[&str] = &[
     "media", "images", "covers", "boxart", "screenshots", "videos", "manuals", "marquees", "bios",
     "saves", "states", "savestates", "snap", "snaps", "titles", "fanart", "downloaded_media", "cheats",
     "textures", "shaders", "system", "firmware", "keys", "updates", "dlc", "__macosx",
+    "mods", "mod", "patches", "romfs", "exefs", "layeredfs", "atmosphere", "contents", "sdmc",
 ];
 
 const IMAGE_EXTS: &[&str] = &["png", "jpg", "jpeg", "webp"];
@@ -86,7 +87,15 @@ impl RomScanner {
             let name = entry.file_name().to_string_lossy().to_string();
 
             if entry.file_type().is_dir() {
-                if entry.depth() > 0 && (name.starts_with('.') || SKIP_DIRS.contains(&name.to_lowercase().as_str())) {
+                let ldir = name.to_lowercase();
+                if entry.depth() > 0
+                    && (name.starts_with('.')
+                        || SKIP_DIRS.contains(&ldir.as_str())
+                        || ldir.contains("[mod]")
+                        || ldir.contains("(mod)")
+                        || ldir.contains("[mods]")
+                        || ldir.contains("(mods)"))
+                {
                     it.skip_current_dir();
                     continue;
                 }
@@ -355,26 +364,36 @@ fn is_secondary_disc(lname: &str, siblings: &HashSet<String>) -> bool {
 }
 
 pub fn is_update_or_dlc(lname: &str, ext: &str) -> bool {
-    if ["[upd", "[dlc", "(update", "(dlc", "[update", "[patch", "(patch", " update ", "_update", "-update"]
-        .iter()
-        .any(|m| lname.contains(m))
+    if [
+        "[upd", "[dlc", "(update", "(dlc", "[update", "[patch", "(patch", " update ", "_update", "-update",
+        "[mod]", "(mod)", "[mods]", "(mods)", "[mod ", "(mod ", " mod.", " mod ", "_mod.", "_mod_",
+        "-mod.", "-mod-", "_mods.", "-mods.", "[romfs", "(romfs", "[exefs", "(exefs", "[cheat", "(cheat",
+        "layeredfs",
+    ]
+    .iter()
+    .any(|m| lname.contains(m))
     {
         return true;
     }
-    // Nintendo Switch NSP/NSZ/XCI/XCZ update & DLC naming patterns:
-    // - Title IDs ending in 800 (updates) or not ending in 000 (DLCs)
+    // Nintendo Switch / Switch 2 NSP/NSZ/XCI/XCZ/NUP update & DLC naming patterns:
+    // - Title IDs (16+ hex chars) ending in 800 (updates) or not ending in 000 (DLCs)
     // - Version tags "[v65536]", "(v131072)", "v1.2.0" when combined with update markers or non-000 versions
-    if matches!(ext, "nsp" | "nsz" | "xci" | "xcz") {
-        // Check any 16-hex-char Switch TitleID inside the filename
+    if matches!(ext, "nsp" | "nsz" | "xci" | "xcz" | "nup") {
+        // Check contiguous hex runs >= 16 chars (e.g. 16-char Switch or 17-char Switch 2 TitleIDs)
         let bytes = lname.as_bytes();
-        if bytes.len() >= 16 {
-            for w in bytes.windows(16) {
-                if w.iter().all(|b| b.is_ascii_hexdigit()) {
-                    // Base games always end with "000"; updates end with "800"; DLCs end with other hex digits.
-                    if &w[13..16] != b"000" {
-                        return true;
-                    }
+        let mut i = 0;
+        while i < bytes.len() {
+            if bytes[i].is_ascii_hexdigit() {
+                let start = i;
+                while i < bytes.len() && bytes[i].is_ascii_hexdigit() {
+                    i += 1;
                 }
+                let run = &bytes[start..i];
+                if run.len() >= 16 && !run.ends_with(b"000") {
+                    return true;
+                }
+            } else {
+                i += 1;
             }
         }
         // Check "[v12345]" or "(v12345)" version tags: base dumps are [v0], updates are [v65536]+
@@ -397,7 +416,7 @@ pub fn is_update_or_dlc(lname: &str, ext: &str) -> bool {
 
 fn is_switch_non_base_serial(serial: Option<&str>, lname: &str) -> bool {
     if let Some(s) = serial {
-        if s.len() == 16 && s.chars().all(|c| c.is_ascii_hexdigit()) && !s.ends_with("000") {
+        if s.len() >= 16 && s.chars().all(|c| c.is_ascii_hexdigit()) && !s.ends_with("000") {
             return true;
         }
     }
@@ -433,7 +452,7 @@ pub fn clean_title(stem: &str) -> (String, Option<String>, Option<String>) {
                         region = Some(r.to_string());
                     }
                 }
-                if serial.is_none() && tag.len() == 16 && tag.chars().all(|x| x.is_ascii_hexdigit()) {
+                if serial.is_none() && (16..=20).contains(&tag.len()) && tag.chars().all(|x| x.is_ascii_hexdigit()) {
                     serial = Some(tag.to_uppercase());
                 }
                 if serial.is_none() && looks_like_serial(&tag) {
@@ -509,5 +528,12 @@ mod tests {
         assert!(is_update_or_dlc("zelda totk [0100f2c0115b6001][v0].nsp", "nsp"));
         assert!(is_update_or_dlc("mario kart 8 deluxe [v131072].nsp", "nsp"));
         assert!(is_update_or_dlc("super smash bros_update_13.0.2.nsp", "nsp"));
+        assert!(is_update_or_dlc("zelda totk 60fps [mod].nsp", "nsp"));
+        assert!(is_update_or_dlc("zelda totk (mod) v2.xci", "xci"));
+        assert!(is_update_or_dlc("mario_kart_8_mod.nsp", "nsp"));
+        assert!(!is_update_or_dlc("modern warfare (usa).nsp", "nsp"));
+        assert!(!is_update_or_dlc("mario kart world [0100f2c0115b6000][v0].nup", "nup"));
+        assert!(!is_update_or_dlc("the legend of zelda ocarina of time [04004860224dec000].nup", "nup"));
+        assert!(is_update_or_dlc("mario kart world [0100f2c0115b6800][v65536].nup", "nup"));
     }
 }

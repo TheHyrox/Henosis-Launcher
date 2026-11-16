@@ -288,6 +288,24 @@ export interface RaGameCandidate {
   isHack: boolean;
 }
 
+export interface SteamAchievement {
+  id: string;
+  title: string;
+  desc: string;
+  iconUrl?: string | null;
+  unlocked: boolean;
+  unlockedAt?: string | null;
+  unlockTime?: number | null;
+  rarity?: number | null;
+  hidden: boolean;
+}
+
+export interface SteamAchievementsResult {
+  status: "ok" | "no_schema" | "no_achievements" | "error";
+  message?: string | null;
+  achievements: SteamAchievement[];
+}
+
 export interface Place {
   name: string;
   path: string;
@@ -392,6 +410,8 @@ export const api = {
   testRaCredentials: (creds: RaCredentials) => invoke<string>("test_ra_credentials", { creds }),
   getRaAchievements: (gameId: number, refresh = false) =>
     invoke<RaGameResult>("get_ra_achievements", { gameId, refresh }),
+  getSteamAchievements: (gameId: number, refresh = false) =>
+    invoke<SteamAchievementsResult>("get_steam_achievements", { gameId, refresh }),
   searchRaGames: (gameId: number, query: string) =>
     invoke<RaGameCandidate[]>("search_ra_games", { gameId, query }),
   applyRaMatch: (gameId: number, raGameId: number, applyMetadata = true) =>

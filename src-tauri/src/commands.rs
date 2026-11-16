@@ -253,6 +253,20 @@ pub async fn get_ra_achievements(
 }
 
 #[tauri::command]
+pub async fn get_steam_achievements(
+    app: AppHandle,
+    game_id: i64,
+    refresh: bool,
+) -> R<crate::steam_achievements::SteamAchievementsResult> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        crate::steam_achievements::game_achievements(&state.db, game_id, refresh)
+    })
+    .await
+    .map_err(e)
+}
+
+#[tauri::command]
 pub async fn search_ra_games(
     app: AppHandle,
     game_id: i64,

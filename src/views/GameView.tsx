@@ -31,6 +31,7 @@ import {
   RaGameCandidate,
   RaGameResult,
   Session,
+  SteamAchievementsResult,
 } from "../api";
 import { CollectibleCard } from "../components/Collectible";
 import { BottomPromptBar } from "../components/TopBar";
@@ -68,90 +69,6 @@ interface AchievementBadge {
   unlocked: boolean;
   unlockedAt?: string;
   iconUrl?: string;
-}
-
-function buildGameAchievements(game: Game, platform: Platform): AchievementBadge[] {
-  const played = (game.playCount || 0) > 0 || (game.playtime || 0) > 60;
-  const hrs = (game.playtime || 0) / 3600;
-  return [
-    {
-      id: "ach-boot",
-      title: "First Boot",
-      desc: `Launch ${game.title} on ${platform.shortName} for the first time.`,
-      icon: "⚡",
-      points: 10,
-      rarity: "78.4% Common",
-      unlocked: true,
-      unlockedAt: game.lastPlayed ? formatRelativeDate(game.lastPlayed) : "Unlocked",
-    },
-    {
-      id: "ach-prologue",
-      title: "Into the World",
-      desc: `Complete the opening chapter and initialize save data in ${game.title}.`,
-      icon: "🗺️",
-      points: 15,
-      rarity: "61.2% Common",
-      unlocked: true,
-      unlockedAt: "Oct 28",
-    },
-    {
-      id: "ach-collector",
-      title: "Physical Collector",
-      desc: `Register ${game.title} in your ${platform.name} 3D vault.`,
-      icon: "💿",
-      points: 15,
-      rarity: "54.0% Common",
-      unlocked: true,
-      unlockedAt: "Unlocked",
-    },
-    {
-      id: "ach-veteran",
-      title: "Dedicated Session",
-      desc: "Log over 1 hour of active gameplay in this title.",
-      icon: "🔥",
-      points: 25,
-      rarity: "32.8% Rare",
-      unlocked: played || hrs >= 1,
-      unlockedAt: played || hrs >= 1 ? "Yesterday" : undefined,
-    },
-    {
-      id: "ach-mastery",
-      title: "Core Tactician",
-      desc: "Conquer mid-game boss encounters without using continue states.",
-      icon: "⚔️",
-      points: 30,
-      rarity: "18.5% Rare",
-      unlocked: hrs >= 5 || game.favorite,
-      unlockedAt: hrs >= 5 || game.favorite ? "Unlocked" : undefined,
-    },
-    {
-      id: "ach-speedrun",
-      title: "Velocity Runner",
-      desc: "Clear a major stage milestone under par time.",
-      icon: "⏱️",
-      points: 40,
-      rarity: "9.4% Very Rare",
-      unlocked: false,
-    },
-    {
-      id: "ach-completionist",
-      title: "100% Archivist",
-      desc: "Discover every secret collectible and optional objective.",
-      icon: "👑",
-      points: 50,
-      rarity: "4.2% Ultra Rare",
-      unlocked: false,
-    },
-    {
-      id: "ach-legend",
-      title: `${platform.shortName} Grandmaster`,
-      desc: `Master all challenges in ${game.title}.`,
-      icon: "🏆",
-      points: 100,
-      rarity: "1.8% Ultra Rare",
-      unlocked: false,
-    },
-  ];
 }
 
 export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
@@ -602,6 +519,9 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
 
   const [ra, setRa] = useState<RaGameResult | null>(null);
   const [raLoading, setRaLoading] = useState(false);
+  const [steamAch, setSteamAch] = useState<SteamAchievementsResult | null>(null);
+  const [steamAchLoading, setSteamAchLoading] = useState(false);
+
   const loadRa = (refresh = false) => {
     if (!game || isSteamGame) return;
     setRaLoading(true);
@@ -611,9 +531,22 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
       .catch((err) => setRa({ status: "error", message: String(err), achievements: [] }))
       .finally(() => setRaLoading(false));
   };
+
+  const loadSteamAch = (refresh = false) => {
+    if (!game || !isSteamGame) return;
+    setSteamAchLoading(true);
+    api
+      .getSteamAchievements(game.id, refresh)
+      .then(setSteamAch)
+      .catch((err) => setSteamAch({ status: "error", message: String(err), achievements: [] }))
+      .finally(() => setSteamAchLoading(false));
+  };
+
   useEffect(() => {
     setRa(null);
+    setSteamAch(null);
     loadRa(false);
+    loadSteamAch(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.id]);
 
@@ -622,6 +555,7 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
   useEffect(() => {
     if (prevRunningRef.current && !isGameRunning) {
       loadRa(false);
+      loadSteamAch(false);
     }
     prevRunningRef.current = isGameRunning;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -642,7 +576,19 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
 
   const achievements = useMemo<AchievementBadge[]>(() => {
     if (!game || !platform) return [];
-    if (isSteamGame) return buildGameAchievements(game, platform);
+    if (isSteamGame) {
+      return (steamAch?.achievements ?? []).map((a) => ({
+        id: a.id,
+        title: a.title,
+        desc: a.desc,
+        icon: "🏆",
+        iconUrl: a.iconUrl ?? undefined,
+        points: 0,
+        rarity: a.rarity != null ? `${a.rarity}% of players` : "Steam Achievement",
+        unlocked: a.unlocked,
+        unlockedAt: a.unlockedAt ?? undefined,
+      }));
+    }
     return (ra?.achievements ?? []).map((a) => ({
       id: String(a.id),
       title: a.title,
@@ -654,11 +600,28 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
       unlocked: a.unlocked,
       unlockedAt: a.unlockedAt ? `${a.unlockedAt}${a.hardcore ? " · Hardcore" : ""}` : undefined,
     }));
-  }, [game, platform, ra, isSteamGame]);
+  }, [game, platform, ra, steamAch, isSteamGame]);
   const unlockedCount = achievements.filter((a) => a.unlocked).length;
   const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
   const raMessage = (() => {
-    if (isSteamGame) return null;
+    if (isSteamGame) {
+      if (steamAchLoading && !steamAch) return "Loading Steam Achievements…";
+      switch (steamAch?.status) {
+        case "no_schema":
+          return (
+            steamAch.message ||
+            "No local Steam achievement schema found yet. Launch the game once in Steam to cache its achievement list."
+          );
+        case "no_achievements":
+          return steamAch.message || "This Steam game has no achievements.";
+        case "error":
+          return steamAch.message || "Could not load Steam achievements.";
+        case "ok":
+          return achievements.length === 0 ? "This Steam game has no achievements." : null;
+        default:
+          return null;
+      }
+    }
     if (raLoading && !ra) return "Loading RetroAchievements…";
     switch (ra?.status) {
       case "no_credentials":
@@ -1843,11 +1806,19 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
                     : "RetroAchievements Integration"}
                 </h3>
                 <p>
-                  Unlocked {unlockedCount} of {achievements.length} badges ·{" "}
-                  {achievements
-                    .filter((a) => a.unlocked)
-                    .reduce((acc, a) => acc + a.points, 0)}{" "}
-                  / {achievements.reduce((acc, a) => acc + a.points, 0)} PTS
+                  {isSteamGame ? (
+                    <>
+                      Unlocked {unlockedCount} of {achievements.length} Steam achievements
+                    </>
+                  ) : (
+                    <>
+                      Unlocked {unlockedCount} of {achievements.length} badges ·{" "}
+                      {achievements
+                        .filter((a) => a.unlocked)
+                        .reduce((acc, a) => acc + a.points, 0)}{" "}
+                      / {achievements.reduce((acc, a) => acc + a.points, 0)} PTS
+                    </>
+                  )}
                 </p>
               </div>
               <div className="ach-summary-meter">
@@ -1866,13 +1837,17 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
             </div>
 
             {raMessage && <p className="card-sub" style={{ margin: "12px 4px" }}>{raMessage}</p>}
-            {!isSteamGame && (
-              <div style={{ margin: "0 4px 10px" }}>
+            <div style={{ margin: "0 4px 10px" }}>
+              {isSteamGame ? (
+                <button className="btn-ghost" disabled={steamAchLoading} onClick={() => loadSteamAch(true)}>
+                  {steamAchLoading ? "Syncing…" : "↻ Sync Steam Achievements"}
+                </button>
+              ) : (
                 <button className="btn-ghost" disabled={raLoading} onClick={() => loadRa(true)}>
                   {raLoading ? "Syncing…" : "↻ Sync RetroAchievements"}
                 </button>
-              </div>
-            )}
+              )}
+            </div>
             <div className="ach-badges-grid">
               {achievements.map((a) => (
                 <div
@@ -1881,7 +1856,7 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
                 >
                   <div className="ach-badge-icon">
                     {a.iconUrl ? (
-                      <img src={a.iconUrl} alt="" style={{ width: 56, height: 56, borderRadius: 6 }} />
+                      <img src={a.iconUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit" }} />
                     ) : a.unlocked ? (
                       a.icon
                     ) : (
@@ -1891,7 +1866,7 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
                   <div className="ach-badge-body">
                     <div className="ach-badge-top">
                       <h4>{a.title}</h4>
-                      <span className="ach-points-pill">{a.points} PTS</span>
+                      {a.points > 0 && <span className="ach-points-pill">{a.points} PTS</span>}
                     </div>
                     <p>{a.desc}</p>
                     <div className="ach-badge-meta">
