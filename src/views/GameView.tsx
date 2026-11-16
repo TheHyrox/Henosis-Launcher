@@ -78,6 +78,7 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
     platforms,
     platformDefs,
     emulators,
+    presets,
     back,
     launchGame,
     running,
@@ -120,7 +121,13 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
     [metaCandidates]
   );
 
-  const tab = TABS[tabIdx].id;
+  const isSteamGame = game?.source === "steam";
+  const visibleTabs = useMemo(
+    () => (isSteamGame ? TABS.filter((t) => t.id !== "settings") : [...TABS]),
+    [isSteamGame]
+  );
+  const safeTabIdx = Math.min(tabIdx, Math.max(0, visibleTabs.length - 1));
+  const tab = (visibleTabs[safeTabIdx] || visibleTabs[0]).id;
 
   const loadAll = async () => {
     try {
@@ -194,13 +201,15 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
 
   // Build controller-navigable rows for the Per-Game Emulator Config tab.
   const isGameRunning = running?.gameId === game?.id;
-  const isSteamGame = game?.source === "steam";
 
   const settingRows: SettingRowSpec[] = useMemo(() => {
     if (!game) return [];
     const s = game.settings || {};
     const isRom = game.source !== "steam" && game.platform !== "pc";
     const activeEmu = preview?.emulator || null;
+    const activePreset = presets.find((p) => p.id === activeEmu?.preset) || null;
+    const supports = activePreset?.supports || [];
+    const hasSupport = (key: string) => !activePreset || supports.includes(key);
 
     const cycle = <T,>(list: T[], cur: T, dir: -1 | 1): T => {
       const i = list.indexOf(cur);
@@ -252,77 +261,85 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
     }
 
     // Graphics & Shader Presets
-    const scales: (number | null)[] = [null, 1, 2, 4, 8];
-    rows.push({
-      id: "resolutionScale",
-      group: "Graphics & Shader Presets",
-      label: "Internal Resolution Upscaling",
-      hint: "1x = Native · 2x = 720p/1080p · 4x = 4K UHD · 8x = 8K Supersampled",
-      valueLabel: s.resolutionScale ? `${s.resolutionScale}x Internal` : "Default (1x Native)",
-      isOverridden: Boolean(s.resolutionScale),
-      onStep: (dir) =>
-        updateSettings({ resolutionScale: cycle(scales, s.resolutionScale ?? null, dir) }),
-      onActivate: () =>
-        updateSettings({ resolutionScale: cycle(scales, s.resolutionScale ?? null, 1) }),
-      onClear: () => updateSettings({ resolutionScale: null }),
-    });
+    if (hasSupport("resolutionScale")) {
+      const scales: (number | null)[] = [null, 1, 2, 4, 8];
+      rows.push({
+        id: "resolutionScale",
+        group: "Graphics & Shader Presets",
+        label: "Internal Resolution Upscaling",
+        hint: "1x = Native · 2x = 720p/1080p · 4x = 4K UHD · 8x = 8K Supersampled",
+        valueLabel: s.resolutionScale ? `${s.resolutionScale}x Internal` : "Default (1x Native)",
+        isOverridden: Boolean(s.resolutionScale),
+        onStep: (dir) =>
+          updateSettings({ resolutionScale: cycle(scales, s.resolutionScale ?? null, dir) }),
+        onActivate: () =>
+          updateSettings({ resolutionScale: cycle(scales, s.resolutionScale ?? null, 1) }),
+        onClear: () => updateSettings({ resolutionScale: null }),
+      });
+    }
 
-    const aspects: (string | null)[] = [null, "4:3", "auto", "16:9", "stretch"];
-    const aspectLabels: Record<string, string> = {
-      "4:3": "Original 4:3",
-      auto: "Integer Scale (Pixel Perfect)",
-      "16:9": "16:9 Widescreen",
-      stretch: "16:9 Stretched",
-    };
-    rows.push({
-      id: "aspectRatio",
-      group: "Graphics & Shader Presets",
-      label: "Aspect Ratio Override",
-      hint: "Original 4:3, Integer Scale, or 16:9 Stretched",
-      valueLabel: s.aspectRatio ? aspectLabels[s.aspectRatio] || s.aspectRatio : "Original / Auto",
-      isOverridden: Boolean(s.aspectRatio),
-      onStep: (dir) => updateSettings({ aspectRatio: cycle(aspects, s.aspectRatio ?? null, dir) }),
-      onActivate: () => updateSettings({ aspectRatio: cycle(aspects, s.aspectRatio ?? null, 1) }),
-      onClear: () => updateSettings({ aspectRatio: null }),
-    });
+    if (hasSupport("aspectRatio")) {
+      const aspects: (string | null)[] = [null, "4:3", "auto", "16:9", "stretch"];
+      const aspectLabels: Record<string, string> = {
+        "4:3": "Original 4:3",
+        auto: "Integer Scale (Pixel Perfect)",
+        "16:9": "16:9 Widescreen",
+        stretch: "16:9 Stretched",
+      };
+      rows.push({
+        id: "aspectRatio",
+        group: "Graphics & Shader Presets",
+        label: "Aspect Ratio Override",
+        hint: "Original 4:3, Integer Scale, or 16:9 Stretched",
+        valueLabel: s.aspectRatio ? aspectLabels[s.aspectRatio] || s.aspectRatio : "Original / Auto",
+        isOverridden: Boolean(s.aspectRatio),
+        onStep: (dir) => updateSettings({ aspectRatio: cycle(aspects, s.aspectRatio ?? null, dir) }),
+        onActivate: () => updateSettings({ aspectRatio: cycle(aspects, s.aspectRatio ?? null, 1) }),
+        onClear: () => updateSettings({ aspectRatio: null }),
+      });
+    }
 
-    const filters: (string | null)[] = [null, "crt-royale", "fsr", "scaleforce", "bilinear", "nearest"];
-    const filterLabels: Record<string, string> = {
-      "crt-royale": "CRT Scanline Shader (Aperture Grille)",
-      fsr: "AMD FSR (Edge-Adaptive Upscaling)",
-      scaleforce: "ScaleForce 4x (Vector Smooth)",
-      bilinear: "Bilinear (Soft Filter)",
-      nearest: "Nearest-Neighbor (Sharp Pixels)",
-    };
-    rows.push({
-      id: "scalingFilter",
-      group: "Graphics & Shader Presets",
-      label: "CRT Scanline & Upscaling Shader",
-      hint: "Post-processing CRT scanline shaders and scaling filters",
-      valueLabel: s.scalingFilter
-        ? filterLabels[s.scalingFilter] || s.scalingFilter.toUpperCase()
-        : "Default (Clean Digital)",
-      isOverridden: Boolean(s.scalingFilter),
-      onStep: (dir) => updateSettings({ scalingFilter: cycle(filters, s.scalingFilter ?? null, dir) }),
-      onActivate: () => updateSettings({ scalingFilter: cycle(filters, s.scalingFilter ?? null, 1) }),
-      onClear: () => updateSettings({ scalingFilter: null }),
-    });
+    if (hasSupport("scalingFilter")) {
+      const filters: (string | null)[] = [null, "crt-royale", "fsr", "scaleforce", "bilinear", "nearest"];
+      const filterLabels: Record<string, string> = {
+        "crt-royale": "CRT Scanline Shader (Aperture Grille)",
+        fsr: "AMD FSR (Edge-Adaptive Upscaling)",
+        scaleforce: "ScaleForce 4x (Vector Smooth)",
+        bilinear: "Bilinear (Soft Filter)",
+        nearest: "Nearest-Neighbor (Sharp Pixels)",
+      };
+      rows.push({
+        id: "scalingFilter",
+        group: "Graphics & Shader Presets",
+        label: "CRT Scanline & Upscaling Shader",
+        hint: "Post-processing CRT scanline shaders and scaling filters",
+        valueLabel: s.scalingFilter
+          ? filterLabels[s.scalingFilter] || s.scalingFilter.toUpperCase()
+          : "Default (Clean Digital)",
+        isOverridden: Boolean(s.scalingFilter),
+        onStep: (dir) => updateSettings({ scalingFilter: cycle(filters, s.scalingFilter ?? null, dir) }),
+        onActivate: () => updateSettings({ scalingFilter: cycle(filters, s.scalingFilter ?? null, 1) }),
+        onClear: () => updateSettings({ scalingFilter: null }),
+      });
+    }
 
-    const apis: (string | null)[] = [null, "vulkan", "opengl", "software"];
-    rows.push({
-      id: "graphicsApi",
-      group: "Graphics & Shader Presets",
-      label: "Graphics API / Renderer",
-      hint: "Rendering backend passed to the emulator",
-      valueLabel: s.graphicsApi ? s.graphicsApi.toUpperCase() : "Default (Vulkan / Auto)",
-      isOverridden: Boolean(s.graphicsApi),
-      onStep: (dir) => updateSettings({ graphicsApi: cycle(apis, s.graphicsApi ?? null, dir) }),
-      onActivate: () => updateSettings({ graphicsApi: cycle(apis, s.graphicsApi ?? null, 1) }),
-      onClear: () => updateSettings({ graphicsApi: null }),
-    });
+    if (hasSupport("graphicsApi")) {
+      const apis: (string | null)[] = [null, "vulkan", "opengl", "software"];
+      rows.push({
+        id: "graphicsApi",
+        group: "Graphics & Shader Presets",
+        label: "Graphics API / Renderer",
+        hint: "Rendering backend passed to the emulator",
+        valueLabel: s.graphicsApi ? s.graphicsApi.toUpperCase() : "Default (Vulkan / Auto)",
+        isOverridden: Boolean(s.graphicsApi),
+        onStep: (dir) => updateSettings({ graphicsApi: cycle(apis, s.graphicsApi ?? null, dir) }),
+        onActivate: () => updateSettings({ graphicsApi: cycle(apis, s.graphicsApi ?? null, 1) }),
+        onClear: () => updateSettings({ graphicsApi: null }),
+      });
+    }
 
     const isDualScreen = ["nds", "n3ds", "wiiu"].includes(game.platform);
-    if (isDualScreen) {
+    if (isDualScreen && hasSupport("screenLayout")) {
       const layouts: (string | null)[] = [
         null,
         "top-bottom",
@@ -356,7 +373,9 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
         onActivate: () => updateSettings({ screenLayout: cycle(layouts, s.screenLayout ?? null, 1) }),
         onClear: () => updateSettings({ screenLayout: null }),
       });
+    }
 
+    if (isDualScreen && hasSupport("swapScreens")) {
       const swapChoices: (boolean | null)[] = [null, true, false];
       rows.push({
         id: "swapScreens",
@@ -382,19 +401,60 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
     const fmtBool = (v: boolean | null | undefined, def = "Default") =>
       v === true ? "Enabled" : v === false ? "Disabled" : def;
 
-    rows.push({
-      id: "vsync",
-      group: "Graphics & Shader Presets",
-      label: "V-Sync Frame Pacing",
-      hint: "Synchronize frame pacing to display refresh rate",
-      valueLabel: fmtBool(s.vsync),
-      isOverridden: s.vsync !== null && s.vsync !== undefined,
-      onStep: (dir) => updateSettings({ vsync: cycle(triBool, s.vsync ?? null, dir) }),
-      onActivate: () => updateSettings({ vsync: cycle(triBool, s.vsync ?? null, 1) }),
-      onClear: () => updateSettings({ vsync: null }),
-    });
+    if (hasSupport("dockedMode")) {
+      rows.push({
+        id: "dockedMode",
+        group: "Graphics & Shader Presets",
+        label: "Console Mode (Docked / Handheld)",
+        hint: "Switch between Docked (1080p) and Handheld (720p) profile",
+        valueLabel:
+          s.dockedMode === true
+            ? "Docked (TV Mode)"
+            : s.dockedMode === false
+              ? "Handheld Mode"
+              : "Default (Global Config)",
+        isOverridden: s.dockedMode !== null && s.dockedMode !== undefined,
+        onStep: (dir) => updateSettings({ dockedMode: cycle(triBool, s.dockedMode ?? null, dir) }),
+        onActivate: () => updateSettings({ dockedMode: cycle(triBool, s.dockedMode ?? null, 1) }),
+        onClear: () => updateSettings({ dockedMode: null }),
+      });
+    }
 
-    if (!isSteamGame) {
+    if (hasSupport("bootMode")) {
+      const bootChoices: (string | null)[] = [null, "direct", "bios"];
+      rows.push({
+        id: "bootMode",
+        group: "Core & Backend Selection",
+        label: "Boot Mode",
+        hint: "Fast-boot directly into the game or boot through the console BIOS",
+        valueLabel:
+          s.bootMode === "direct"
+            ? "Fast Boot (Direct)"
+            : s.bootMode === "bios"
+              ? "BIOS / Full Boot"
+              : "Default",
+        isOverridden: Boolean(s.bootMode),
+        onStep: (dir) => updateSettings({ bootMode: cycle(bootChoices, s.bootMode ?? null, dir) }),
+        onActivate: () => updateSettings({ bootMode: cycle(bootChoices, s.bootMode ?? null, 1) }),
+        onClear: () => updateSettings({ bootMode: null }),
+      });
+    }
+
+    if (hasSupport("vsync")) {
+      rows.push({
+        id: "vsync",
+        group: "Graphics & Shader Presets",
+        label: "V-Sync Frame Pacing",
+        hint: "Synchronize frame pacing to display refresh rate",
+        valueLabel: fmtBool(s.vsync),
+        isOverridden: s.vsync !== null && s.vsync !== undefined,
+        onStep: (dir) => updateSettings({ vsync: cycle(triBool, s.vsync ?? null, dir) }),
+        onActivate: () => updateSettings({ vsync: cycle(triBool, s.vsync ?? null, 1) }),
+        onClear: () => updateSettings({ vsync: null }),
+      });
+    }
+
+    if (!isSteamGame && hasSupport("raHardcore")) {
       rows.push({
         id: "raHardcore",
         group: "RetroAchievements",
@@ -497,7 +557,7 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
     });
 
     return rows;
-  }, [game, preview, compatibleEmulators, cores, isSteamGame]);
+  }, [game, preview, compatibleEmulators, cores, isSteamGame, presets]);
 
   const settingRowsRef = useRef<HTMLDivElement | null>(null);
   const safeSettingIdx = Math.min(settingIdx, Math.max(0, settingRows.length - 1));
@@ -1245,11 +1305,11 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
       return true;
     }
     if (btn === "lb") {
-      setTabIdx((i) => (i - 1 + TABS.length) % TABS.length);
+      setTabIdx((i) => (i - 1 + visibleTabs.length) % visibleTabs.length);
       return true;
     }
     if (btn === "rb") {
-      setTabIdx((i) => (i + 1) % TABS.length);
+      setTabIdx((i) => (i + 1) % visibleTabs.length);
       return true;
     }
     if (btn === "x" && game) {
@@ -1363,10 +1423,10 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
         </button>
 
         <div className="game-tabs">
-          {TABS.map((t, idx) => (
+          {visibleTabs.map((t, idx) => (
             <button
               key={t.id}
-              className={`game-tab ${idx === tabIdx ? "active" : ""}`}
+              className={`game-tab ${idx === safeTabIdx ? "active" : ""}`}
               onClick={() => setTabIdx(idx)}
             >
               {t.label}
@@ -1639,13 +1699,17 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
           </div>
         )}
 
-        {tab === "settings" && (
+        {tab === "settings" && (() => {
+          const activeSupports = presets.find((p) => p.id === preview?.emulator?.preset)?.supports;
+          const canQuick = (key: string) => !activeSupports || activeSupports.includes(key);
+          return (
           /* ═══════════════════════════════════════════════════════════════════
              TAB 2: PER-GAME EMULATOR CONFIGURATION
              ═══════════════════════════════════════════════════════════════════ */
           <div className="game-settings-panel">
             {/* Quick Graphics & Shader Preset Bar */}
             <div className="emu-preset-strip">
+              {canQuick("resolutionScale") && (
               <div className="emu-preset-group">
                 <span className="preset-group-label">Upscaling Multiplier</span>
                 <div className="preset-pills">
@@ -1660,7 +1724,9 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
                   ))}
                 </div>
               </div>
+              )}
 
+              {canQuick("aspectRatio") && (
               <div className="emu-preset-group">
                 <span className="preset-group-label">Aspect Ratio Override</span>
                 <div className="preset-pills">
@@ -1679,7 +1745,9 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
                   ))}
                 </div>
               </div>
+              )}
 
+              {canQuick("scalingFilter") && (
               <div className="emu-preset-group">
                 <span className="preset-group-label">Shader Preset</span>
                 <div className="preset-pills">
@@ -1698,6 +1766,7 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
                   ))}
                 </div>
               </div>
+              )}
 
               <button className="btn-ghost" onClick={resetAllSettings}>
                 Reset Defaults
@@ -1778,7 +1847,8 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
               })}
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {tab === "achievements" && (
           /* ═══════════════════════════════════════════════════════════════════
@@ -2345,7 +2415,7 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
           {
             btn: "LB/RB",
             label: "Tab",
-            onClick: () => setTabIdx((i) => (i + 1) % TABS.length),
+            onClick: () => setTabIdx((i) => (i + 1) % visibleTabs.length),
           },
           {
             btn: "Y",

@@ -256,6 +256,11 @@ export const SettingsView: React.FC<{ initialSection?: SectionId }> = ({
     [platformDefs]
   );
 
+  const supportedConsolePlatforms = useMemo(() => {
+    const supportedIds = new Set(presets.flatMap((p) => p.platforms));
+    return consolePlatforms.filter((p) => supportedIds.has(p.id));
+  }, [consolePlatforms, presets]);
+
   const groupedConsoles = useMemo(() => {
     const map: Record<string, Platform[]> = {};
     for (const m of MAKER_GROUPS) map[m] = [];
@@ -477,18 +482,45 @@ export const SettingsView: React.FC<{ initialSection?: SectionId }> = ({
               )}
 
               <div className="settings-group-header">
-                <h3>Add from preset</h3>
+                <h3>Supported Emulators</h3>
               </div>
-              <div className="preset-chips">
-                {presets.map((p) => (
-                  <button
-                    key={p.id}
-                    className="preset-chip"
-                    onClick={() => startNewEmulator(p.id)}
-                  >
-                    + {p.name}
-                  </button>
-                ))}
+              <div className="settings-list">
+                {presets.map((p) => {
+                  const plats = p.platforms
+                    .map((pid) => platformDefs.find((pl) => pl.id === pid)?.shortName || pid)
+                    .join(", ");
+                  return (
+                    <div key={p.id} className="setting-row">
+                      <div className="setting-row-info">
+                        <div className="emu-row-title">
+                          <strong>{p.name}</strong>
+                          {plats && <span className="emu-row-type">{plats}</span>}
+                        </div>
+                        {p.url && (
+                          <p className="emu-row-meta">
+                            <code className="mono-path">{p.url}</code>
+                          </p>
+                        )}
+                      </div>
+                      <div className="setting-row-controls">
+                        {p.url && (
+                          <button
+                            className="btn-ghost btn-sm"
+                            onClick={() => api.openExternalUrl(p.url).catch(() => {})}
+                          >
+                            Source ↗
+                          </button>
+                        )}
+                        <button
+                          className="btn-ghost btn-sm"
+                          onClick={() => startNewEmulator(p.id)}
+                        >
+                          + Add
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -1078,7 +1110,7 @@ export const SettingsView: React.FC<{ initialSection?: SectionId }> = ({
             <div className="editor-plat-picker">
               <span>Supported consoles</span>
               <div className="editor-plat-chips">
-                {consolePlatforms.map((p) => {
+                {supportedConsolePlatforms.map((p) => {
                   const active = editingEmu.platforms.includes(p.id);
                   return (
                     <button

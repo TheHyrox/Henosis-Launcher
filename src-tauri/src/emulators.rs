@@ -22,99 +22,106 @@ pub struct Preset {
     /// Generic settings this emulator can receive from the launcher.
     pub supports: &'static [&'static str],
     pub notes: &'static str,
+    pub url: &'static str,
 }
 
 macro_rules! preset {
-    ($id:expr, $name:expr, [$($p:expr),*], [$($b:expr),*], [$($f:expr),*], [$($a:expr),*], $args:expr, [$($s:expr),*], $notes:expr) => {
+    ($id:expr, $name:expr, [$($p:expr),*], [$($b:expr),*], [$($f:expr),*], [$($a:expr),*], $args:expr, [$($s:expr),*], $notes:expr, $url:expr) => {
         Preset { id: $id, name: $name, platforms: &[$($p),*], binaries: &[$($b),*], flatpaks: &[$($f),*],
-                 appimages: &[$($a),*], args: $args, supports: &[$($s),*], notes: $notes }
+                 appimages: &[$($a),*], args: $args, supports: &[$($s),*], notes: $notes, url: $url }
     };
 }
 
 pub static PRESETS: &[Preset] = &[
-    preset!("retroarch", "RetroArch",
-        ["nes", "snes", "n64", "gb", "gbc", "gba", "nds", "virtualboy", "psx", "psp", "mastersystem", "megadrive",
-         "segacd", "sega32x", "gamegear", "saturn", "dreamcast", "arcade", "neogeo", "ngp", "pcengine", "pcenginecd",
-         "3do", "atari2600", "atari7800", "lynx", "jaguar", "wonderswan", "msx", "c64", "pokemini"],
-        ["retroarch"], ["org.libretro.RetroArch"], ["retroarch"],
-        "-L {core} {settings} {rom}",
-        ["core", "graphicsApi", "vsync", "aspectRatio", "screenLayout", "bootMode", "fullscreen", "advanced"],
-        "Per-game options are written to a temporary config passed with --appendconfig. Advanced lines use RetroArch cfg syntax: key = \"value\"."),
     preset!("duckstation", "DuckStation", ["psx"],
         ["duckstation-qt", "duckstation"], ["org.duckstation.DuckStation"], ["duckstation"],
-        "{settings} -batch -- {rom}", ["fullscreen"],
-        "DuckStation keeps its own per-game settings (Game Properties); the launcher controls fullscreen/batch mode."),
+        "{settings} -batch -- {rom}", ["fullscreen", "bootMode", "advanced"],
+        "DuckStation keeps its own per-game settings (Game Properties); the launcher controls fullscreen, boot mode, and batch mode.",
+        "https://github.com/stenzek/duckstation"),
     preset!("pcsx2", "PCSX2", ["ps2"],
         ["pcsx2-qt", "pcsx2"], ["net.pcsx2.PCSX2"], ["pcsx2"],
-        "{settings} -batch -- {rom}", ["fullscreen"],
-        "PCSX2 stores per-game settings in its gamesettings folder; use Config Overrides for full control."),
+        "{settings} -batch -- {rom}", ["fullscreen", "bootMode", "advanced"],
+        "PCSX2 stores per-game settings in its gamesettings folder; use Config Overrides or launch arguments for full control.",
+        "https://github.com/PCSX2/pcsx2"),
     preset!("rpcs3", "RPCS3", ["ps3"],
         ["rpcs3"], ["net.rpcs3.RPCS3"], ["rpcs3"],
-        "--no-gui {settings} {rom}", ["advanced"],
-        "Advanced entries are passed as raw arguments (e.g. --config /path/custom.yml)."),
+        "--no-gui {settings} {rom}", ["fullscreen", "advanced"],
+        "Launches with --no-gui; supports --fullscreen and raw CLI arguments (e.g. --config /path/custom.yml).",
+        "https://github.com/RPCS3/rpcs3"),
     preset!("ppsspp", "PPSSPP", ["psp"],
         ["PPSSPPSDL", "ppsspp", "PPSSPPQt", "ppsspp-sdl", "ppsspp-qt"], ["org.ppsspp.PPSSPP"], ["ppsspp"],
-        "{settings} {rom}", ["fullscreen", "graphicsApi"], ""),
+        "{settings} {rom}", ["fullscreen", "graphicsApi", "resolutionScale", "advanced"], "",
+        "https://github.com/hrydgard/ppsspp"),
     preset!("vita3k", "Vita3K", ["psvita"],
         ["Vita3K", "vita3k"], [], ["vita3k"],
-        "{settings} {rom}", ["fullscreen"],
-        "Installed titles are launched by title id (-r). Unrecognised items are passed as a path."),
-    preset!("dolphin", "Dolphin", ["gc", "wii"],
-        ["dolphin-emu", "dolphin-emu-nogui"], ["org.DolphinEmu.dolphin-emu"], ["dolphin"],
-        "-b {settings} -e {rom}",
-        ["graphicsApi", "resolutionScale", "vsync", "aspectRatio", "fullscreen", "cpuOverclock", "render3d", "advanced"],
-        "Settings are applied through Dolphin -C overrides (never written to your global config). Advanced: System.Section.Key=Value."),
-    preset!("cemu", "Cemu", ["wiiu"],
-        ["cemu", "Cemu"], ["info.cemu.Cemu"], ["cemu"],
-        "{settings} -g {rom}", ["fullscreen"], ""),
-    preset!("ryujinx", "Ryujinx (Ryubing)", ["switch"],
-        ["ryujinx", "Ryujinx"], ["io.github.ryubing.Ryujinx", "org.ryujinx.Ryujinx"], ["ryujinx", "ryubing"],
-        "{settings} {rom}", ["fullscreen", "graphicsApi"], ""),
-    preset!("eden", "Eden", ["switch"],
-        ["eden", "eden-cli"], ["dev.eden_emu.eden"], ["eden"],
-        "{settings} -g {rom}", ["fullscreen", "dockedMode", "resolutionScale", "scalingFilter", "advanced"], ""),
-    preset!("citron", "Citron", ["switch"],
-        ["citron"], ["org.citron_emu.citron"], ["citron"],
-        "{settings} -g {rom}", ["fullscreen", "dockedMode", "resolutionScale", "scalingFilter", "advanced"], ""),
-    preset!("sudachi", "Sudachi", ["switch"],
-        ["sudachi"], [], ["sudachi"],
-        "{settings} -g {rom}", ["fullscreen", "dockedMode", "resolutionScale", "scalingFilter", "advanced"], ""),
+        "{settings} {rom}", ["fullscreen", "advanced"],
+        "Installed titles are launched by title id (-r). Unrecognised items are passed as a path.",
+        "https://github.com/Vita3K/Vita3K"),
+    preset!("gambatte", "Gambatte", ["gb", "gbc"],
+        ["gambatte_qt", "gambatte_sdl", "gambatte"], [], ["gambatte"],
+        "{settings} {rom}", ["advanced"], "",
+        "https://github.com/BenHetherington/gambatte"),
+    preset!("mgba", "mGBA", ["gba"],
+        ["mgba-qt", "mgba"], ["io.mgba.mGBA"], ["mgba"],
+        "{settings} {rom}", ["fullscreen", "resolutionScale", "advanced"], "",
+        "https://github.com/mgba-emu/mgba"),
+    preset!("melonds", "melonDS", ["nds"],
+        ["melonDS", "melonds"], ["net.kuribo64.melonDS"], ["melonds"],
+        "{settings} {rom}",
+        ["fullscreen", "screenLayout", "screenRotation", "swapScreens", "screenGap", "bootMode", "resolutionScale", "graphicsApi", "scalingFilter", "vsync", "raHardcore", "advanced"],
+        "Custom Henosis build with direct CLI flags for layout, sizing, rotation, screen gap/swap, OpenGL scale, RetroAchievements, and pre-configured SDL gamepad support.",
+        "https://github.com/TheHyrox/melonDS"),
     preset!("azahar", "Azahar", ["n3ds"],
         ["azahar", "azahar-qt"], ["org.azahar_emu.Azahar"], ["azahar"],
         "{settings} {rom}",
         ["fullscreen", "screenLayout", "screenRotation", "swapScreens", "screenGap", "resolutionScale", "graphicsApi", "scalingFilter", "aspectRatio", "vsync", "render3d", "cpuOverclock", "advanced"],
-        "Custom Henosis build with direct CLI flags for layout, rotation, screen swap, resolution scale, 3D mode, and pre-configured SDL gamepad support."),
-    preset!("lime3ds", "Lime3DS", ["n3ds"],
-        ["lime3ds", "lime3ds-gui"], ["io.github.lime3ds.Lime3DS"], ["lime3ds"],
-        "{settings} {rom}", ["fullscreen", "screenLayout", "resolutionScale", "render3d", "advanced"], ""),
-    preset!("melonds", "melonDS", ["nds"],
-        ["melonDS", "melonds"], ["net.kuribo64.melonDS"], ["melonds"],
-        "{settings} {rom}",
-        ["fullscreen", "screenLayout", "screenRotation", "swapScreens", "screenGap", "bootMode", "resolutionScale", "graphicsApi", "scalingFilter", "vsync", "advanced"],
-        "Custom Henosis build with direct CLI flags for layout, sizing, rotation, screen gap/swap, OpenGL scale, and pre-configured SDL gamepad support."),
-    preset!("mgba", "mGBA", ["gba", "gb", "gbc"],
-        ["mgba-qt", "mgba"], ["io.mgba.mGBA"], ["mgba"],
-        "{settings} {rom}", ["fullscreen"], ""),
-    preset!("flycast", "Flycast", ["dreamcast", "arcade"],
-        ["flycast"], ["org.flycast.Flycast"], ["flycast"],
+        "Custom Henosis build with direct CLI flags for layout, rotation, screen swap, resolution scale, 3D mode, and pre-configured SDL gamepad support.",
+        "https://github.com/azahar-emu/azahar"),
+    preset!("eden", "Eden", ["switch"],
+        ["eden", "eden-cli"], ["dev.eden_emu.eden"], ["eden"],
+        "{settings} -g {rom}", ["fullscreen", "dockedMode", "resolutionScale", "scalingFilter", "advanced"], "",
+        "https://git.eden-emu.dev/eden-emu/eden"),
+    preset!("litchii", "Litchii", ["switch2", "switch"],
+        ["litchii", "Litchii", "lichii", "Lichii"], [], ["litchii", "lichii"],
         "{settings} {rom}", ["fullscreen", "advanced"],
-        "Advanced entries become -config section:key=value overrides."),
+        "Nintendo Switch 2 emulator (also compatible with Nintendo Switch titles).",
+        "https://github.com/zortos293/Lichii"),
+    preset!("mesen", "Mesen", ["nes"],
+        ["Mesen", "mesen"], [], ["mesen"],
+        "{settings} {rom}", ["fullscreen", "advanced"], "",
+        "https://github.com/nesdev-org/MesenCE"),
+    preset!("snes9x", "Snes9x", ["snes"],
+        ["snes9x-gtk", "snes9x"], ["com.snes9x.Snes9x"], ["snes9x"],
+        "{settings} {rom}", ["fullscreen", "advanced"], "",
+        "https://github.com/snes9xgit/snes9x"),
+    preset!("project64", "Project64", ["n64"],
+        ["Project64", "project64"], [], ["project64"],
+        "{settings} {rom}", ["advanced"],
+        "Windows emulator; can be pointed to a Wine / Proton wrapper script.",
+        "https://github.com/project64/project64"),
+    preset!("dolphin", "Dolphin", ["gc", "wii"],
+        ["dolphin-emu", "dolphin-emu-nogui"], ["org.DolphinEmu.dolphin-emu"], ["dolphin"],
+        "-b {settings} -e {rom}",
+        ["graphicsApi", "resolutionScale", "vsync", "aspectRatio", "fullscreen", "cpuOverclock", "render3d", "advanced"],
+        "Settings are applied through Dolphin -C overrides (never written to your global config). Advanced: System.Section.Key=Value.",
+        "https://github.com/dolphin-emu/dolphin"),
+    preset!("cemu", "Cemu", ["wiiu"],
+        ["cemu", "Cemu"], ["info.cemu.Cemu"], ["cemu"],
+        "{settings} -g {rom}", ["fullscreen", "advanced"], "",
+        "https://github.com/cemu-project/Cemu"),
     preset!("xemu", "xemu", ["xbox"],
         ["xemu"], ["app.xemu.xemu"], ["xemu"],
-        "{settings} -dvd_path {rom}", ["fullscreen"],
-        "Requires your own MCPX boot ROM, flash BIOS and HDD image configured inside xemu."),
-    preset!("xenia", "Xenia Canary", ["xbox360"],
+        "{settings} -dvd_path {rom}", ["fullscreen", "advanced"],
+        "Requires your own MCPX boot ROM, flash BIOS and HDD image configured inside xemu.",
+        "https://github.com/xemu-project/xemu"),
+    preset!("xenia", "Xenia", ["xbox360"],
         ["xenia_canary", "xenia-canary", "xenia"], [], ["xenia"],
-        "{settings} {rom}", ["fullscreen"],
-        "The Linux build is experimental; you can also point this to a Wine wrapper script."),
-    preset!("mednafen", "Mednafen", ["psx", "saturn", "pcengine", "pcenginecd", "gb", "gbc", "gba", "nes", "snes",
-        "megadrive", "mastersystem", "gamegear", "lynx", "ngp", "wonderswan", "virtualboy"],
-        ["mednafen"], [], [], "{settings} {rom}", ["fullscreen"], ""),
-    preset!("mame", "MAME", ["arcade", "neogeo"],
-        ["mame"], ["org.mamedev.MAME"], [],
-        "{settings} -rompath {rom_dir} {rom_stem}", ["fullscreen"], ""),
+        "{settings} {rom}", ["fullscreen", "advanced"],
+        "The Linux build is experimental; you can also point this to a Wine wrapper script.",
+        "https://github.com/xenia-project/xenia"),
     preset!("custom", "Custom Emulator", [], [], [], [], "{rom}", ["advanced"],
-        "Any executable. Tokens: {rom} {path} {rom_dir} {rom_stem} {bios} {serial} {settings}."),
+        "Any executable. Tokens: {rom} {path} {rom_dir} {rom_stem} {bios} {serial} {settings}.",
+        ""),
 ];
 
 pub fn preset(id: &str) -> Option<&'static Preset> {
@@ -572,11 +579,41 @@ pub fn build_command(emu: &Emulator, ctx: &BuildContext) -> Result<CommandSpec, 
                 settings_args.extend(["-config".into(), a.clone()]);
             }
         }
-        "duckstation" | "pcsx2" => settings_args.push(if fullscreen { "-fullscreen" } else { "-nofullscreen" }.into()),
-        "cemu" | "mgba" => {
+        "duckstation" | "pcsx2" => {
+            settings_args.push(if fullscreen { "-fullscreen" } else { "-nofullscreen" }.into());
+            match s.boot_mode.as_deref() {
+                Some("direct") => settings_args.push("-fastboot".into()),
+                Some("bios") => settings_args.push("-slowboot".into()),
+                _ => {}
+            }
+            settings_args.extend(s.advanced.iter().flatten().flat_map(|l| shell_split(l)));
+        }
+        "cemu" => {
             if fullscreen {
                 settings_args.push("-f".into());
             }
+            settings_args.extend(s.advanced.iter().flatten().flat_map(|l| shell_split(l)));
+        }
+        "mgba" => {
+            if fullscreen {
+                settings_args.push("-f".into());
+            }
+            if let Some(scale) = s.resolution_scale {
+                settings_args.push(format!("--scale={scale}"));
+            }
+            settings_args.extend(s.advanced.iter().flatten().flat_map(|l| shell_split(l)));
+        }
+        "mesen" => {
+            if fullscreen {
+                settings_args.push("--fullscreen".into());
+            }
+            settings_args.extend(s.advanced.iter().flatten().flat_map(|l| shell_split(l)));
+        }
+        "snes9x" => {
+            if fullscreen {
+                settings_args.push("-fullscreen".into());
+            }
+            settings_args.extend(s.advanced.iter().flatten().flat_map(|l| shell_split(l)));
         }
         "melonds" => {
             if let Some((user, token, hc, hash)) = ctx.ra.as_ref() {
@@ -901,6 +938,13 @@ pub fn build_command(emu: &Emulator, ctx: &BuildContext) -> Result<CommandSpec, 
                     }
                 }
             }
+            settings_args.extend(s.advanced.iter().flatten().flat_map(|l| shell_split(l)));
+        }
+        "litchii" => {
+            if fullscreen {
+                settings_args.push("-f".into());
+            }
+            settings_args.extend(s.advanced.iter().flatten().flat_map(|l| shell_split(l)));
         }
         "ryujinx" => {
             if fullscreen {
@@ -914,10 +958,16 @@ pub fn build_command(emu: &Emulator, ctx: &BuildContext) -> Result<CommandSpec, 
         "ppsspp" => {
             if fullscreen {
                 settings_args.push("--fullscreen".into());
+            } else {
+                settings_args.push("--windowed".into());
             }
             if let Some(api) = &s.graphics_api {
-                settings_args.push(format!("--graphics={}", if api == "opengl" { "opengl" } else { "vulkan" }));
+                settings_args.push(format!("--graphics={}", if api == "opengl" { "opengl" } else if api == "software" { "software" } else { "vulkan" }));
             }
+            if let Some(scale) = s.resolution_scale {
+                settings_args.push(format!("--scale={scale}"));
+            }
+            settings_args.extend(s.advanced.iter().flatten().flat_map(|l| shell_split(l)));
         }
         "vita3k" => {
             if fullscreen {
@@ -926,22 +976,28 @@ pub fn build_command(emu: &Emulator, ctx: &BuildContext) -> Result<CommandSpec, 
             if let Some(id) = &game.serial {
                 target = vec!["-r".into(), id.clone()];
             }
+            settings_args.extend(s.advanced.iter().flatten().flat_map(|l| shell_split(l)));
         }
         "xemu" => {
             if fullscreen {
                 settings_args.push("-full-screen".into());
             }
+            settings_args.extend(s.advanced.iter().flatten().flat_map(|l| shell_split(l)));
         }
         "xenia" => {
             if fullscreen {
                 settings_args.push("--fullscreen=true".into());
             }
+            settings_args.extend(s.advanced.iter().flatten().flat_map(|l| shell_split(l)));
         }
         "mednafen" => {
             settings_args.extend(["-video.fs".into(), if fullscreen { "1".into() } else { "0".into() }]);
         }
         "mame" => settings_args.push(if fullscreen { "-nowindow" } else { "-window" }.into()),
         "rpcs3" => {
+            if fullscreen {
+                settings_args.push("--fullscreen".into());
+            }
             let eboot = path.join("PS3_GAME/USRDIR/EBOOT.BIN");
             let hdd = path.join("USRDIR/EBOOT.BIN");
             if eboot.is_file() {
@@ -949,7 +1005,7 @@ pub fn build_command(emu: &Emulator, ctx: &BuildContext) -> Result<CommandSpec, 
             } else if hdd.is_file() {
                 target = vec![hdd.to_string_lossy().to_string()];
             }
-            settings_args.extend(s.advanced.iter().flatten().filter(|l| !l.trim().is_empty()).cloned());
+            settings_args.extend(s.advanced.iter().flatten().flat_map(|l| shell_split(l)));
         }
         _ => {
             settings_args.extend(s.advanced.iter().flatten().flat_map(|l| shell_split(l)));

@@ -16,7 +16,7 @@
 
 ## 🌟 Overview
 
-**Henosis Launcher** is a modern, controller-first PC gaming hub designed to be the central living-room and desktop interface for all your games. It seamlessly unifies modern **Steam PC games**, standalone executables, and physical retro collections across **42 gaming platforms** running through native emulators (RetroArch, Cemu, Ryujinx, RPCS3, PCSX2, Dolphin, Xenia, DuckStation, and more).
+**Henosis Launcher** is a modern, controller-first PC gaming hub designed to be the central living-room and desktop interface for all your games. It seamlessly unifies modern **Steam PC games**, standalone executables, and physical retro collections across **42 gaming platforms** running through curated native emulators (DuckStation, PCSX2, RPCS3, PPSSPP, Dolphin, Cemu, Eden, Azahar, melonDS, Xenia, and more).
 
 Instead of a flat digital list, Henosis recreates the nostalgic feeling of browsing physical game cases, optical discs, and molded retro cartridges in interactive 3D, elevated by dynamic console environments that transform your screen to match each platform's design aesthetic.
 
@@ -62,6 +62,35 @@ The background color palette, ambient lighting, and animated visuals adapt in re
 | **Sega** | Master System, Genesis / Mega Drive, Sega CD, Sega 32X, Saturn, Dreamcast, Game Gear |
 | **Microsoft** | Original Xbox, Xbox 360 |
 | **Retro & Other** | Neo Geo, Neo Geo Pocket, Atari 2600, Atari 7800, Atari Lynx, WonderSwan, PC Engine / TurboGrafx-16, MSX |
+
+---
+
+## 🧩 Supported Emulators
+
+To guarantee compatibility, per-game configuration, and controller-first integration, Henosis officially supports the following emulators:
+
+| Platform | Emulator | Repository |
+| :--- | :--- | :--- |
+| **PlayStation 1 (PS1)** | **DuckStation** | [github.com/stenzek/duckstation](https://github.com/stenzek/duckstation) |
+| **PlayStation 2 (PS2)** | **PCSX2** | [github.com/PCSX2/pcsx2](https://github.com/PCSX2/pcsx2) |
+| **PlayStation 3 (PS3)** | **RPCS3** | [github.com/RPCS3/rpcs3](https://github.com/RPCS3/rpcs3) |
+| **PlayStation Portable (PSP)** | **PPSSPP** | [github.com/hrydgard/ppsspp](https://github.com/hrydgard/ppsspp) |
+| **PlayStation Vita (PS Vita)** | **Vita3K** | [github.com/Vita3K/Vita3K](https://github.com/Vita3K/Vita3K) |
+| **Game Boy (GB)** | **Gambatte** | [github.com/BenHetherington/gambatte](https://github.com/BenHetherington/gambatte) |
+| **Game Boy Color (GBC)** | **Gambatte** | [github.com/BenHetherington/gambatte](https://github.com/BenHetherington/gambatte) |
+| **Game Boy Advance (GBA)** | **mGBA** | [github.com/mgba-emu/mgba](https://github.com/mgba-emu/mgba) |
+| **Nintendo DS (NDS)** | **melonDS** | [github.com/TheHyrox/melonDS](https://github.com/TheHyrox/melonDS) |
+| **Nintendo 3DS (3DS)** | **Azahar** | [github.com/azahar-emu/azahar](https://github.com/azahar-emu/azahar) |
+| **Nintendo Switch** | **Eden** | [git.eden-emu.dev/eden-emu/eden](https://git.eden-emu.dev/eden-emu/eden) |
+| **Nintendo Switch 2** | **Litchii** *(also compatible with Switch)* | [github.com/zortos293/Lichii](https://github.com/zortos293/Lichii) |
+| **NES** | **Mesen** | [github.com/nesdev-org/MesenCE](https://github.com/nesdev-org/MesenCE) |
+| **SNES** | **Snes9x** | [github.com/snes9xgit/snes9x](https://github.com/snes9xgit/snes9x) |
+| **Nintendo 64 (N64)** | **Project64** | [github.com/project64/project64](https://github.com/project64/project64) |
+| **GameCube** | **Dolphin** | [github.com/dolphin-emu/dolphin](https://github.com/dolphin-emu/dolphin) |
+| **Wii** | **Dolphin** | [github.com/dolphin-emu/dolphin](https://github.com/dolphin-emu/dolphin) |
+| **Wii U** | **Cemu** | [github.com/cemu-project/Cemu](https://github.com/cemu-project/Cemu) |
+| **Xbox** | **xemu** | [github.com/xemu-project/xemu](https://github.com/xemu-project/xemu) |
+| **Xbox 360** | **Xenia** | [github.com/xenia-project/xenia](https://github.com/xenia-project/xenia) |
 
 ---
 

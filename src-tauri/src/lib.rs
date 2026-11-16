@@ -201,6 +201,7 @@ pub fn run() {
             commands::get_pad_status,
             commands::report_test_state,
             commands::fetch_image_data_url,
+            commands::open_external_url,
         ])
         .run(tauri::generate_context!())
         .expect("error running henosis launcher");

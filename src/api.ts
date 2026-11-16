@@ -183,6 +183,7 @@ export interface Preset {
   args: string;
   supports: string[];
   notes: string;
+  url: string;
 }
 
 export interface AppSettings {
@@ -455,6 +456,7 @@ export const api = {
   hideWindow: () => invoke<void>("hide_window"),
   quitApp: () => invoke<void>("quit_app"),
   fetchImageDataUrl: (url: string) => invoke<string>("fetch_image_data_url", { url }),
+  openExternalUrl: (url: string) => invoke<void>("open_external_url", { url }),
 };
 
 /** Compute accessible high-contrast foreground text color (#0b0e17 vs #ffffff) for any background hex */

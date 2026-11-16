@@ -692,3 +692,18 @@ pub async fn fetch_image_data_url(url: String) -> R<String> {
     guard.insert(url, data_url.clone());
     Ok(data_url)
 }
+
+#[tauri::command]
+pub fn open_external_url(url: String) -> R<()> {
+    if !url.starts_with("https://") && !url.starts_with("http://") {
+        return Err("Only http/https URLs supported".into());
+    }
+    std::process::Command::new("xdg-open")
+        .arg(&url)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .map_err(e)?;
+    Ok(())
+}
