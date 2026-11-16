@@ -656,9 +656,6 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
                         <div className="poster-card-gloss" />
                         {g.favorite && <span className="poster-fav-badge">★</span>}
                       </div>
-                      <div className="poster-card-footer">
-                        <span className="poster-card-name">{g.title}</span>
-                      </div>
                     </div>
                   );
                 })}

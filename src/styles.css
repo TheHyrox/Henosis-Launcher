@@ -7574,3 +7574,63 @@ code,
   font-size: 13px;
   color: #9ca3af;
 }
+
+/* ── Bugfixes: Grid overlay removal, Console Carousel 3D distortion, Collectible aspect ratios & spotlight ── */
+
+.henosis-stage::before,
+.showcase-grid-floor,
+.case-ground-spotlight,
+.hero-card-pedestal-glow {
+  display: none !important;
+  content: none !important;
+}
+
+.console-carousel-track {
+  perspective: none !important;
+}
+
+.console-hero-card {
+  flex: 0 0 340px !important;
+  width: 340px;
+  height: clamp(410px, 56vh, 500px);
+  transform: scale(calc(1 - min(0.14, abs(var(--offset, 0)) * 0.05))) !important;
+}
+
+.console-hero-card.is-focused,
+.console-hero-card:hover {
+  transform: translateY(-8px) scale(1.04) !important;
+}
+
+/* Authentic Physical Case Aspect Ratios */
+.physical-3d-item.case-type-nds,
+.physical-3d-item.case-type-3ds,
+.physical-3d-item.case-type-jewel {
+  height: 210px;
+}
+
+.physical-3d-item.case-type-nds .case-3d-wrapper,
+.physical-3d-item.case-type-3ds .case-3d-wrapper,
+.physical-3d-item.case-type-jewel .case-3d-wrapper {
+  height: 200px;
+}
+
+.physical-3d-item.case-type-nds .case-3d-box,
+.physical-3d-item.case-type-3ds .case-3d-box {
+  width: 196px;
+  height: 182px;
+}
+
+.physical-3d-item.case-type-jewel .case-3d-box {
+  width: 192px;
+  height: 186px;
+}
+
+.physical-3d-item.case-type-switch .case-3d-box {
+  width: 156px;
+  height: 252px;
+}
+
+.physical-3d-item.case-type-psp .case-3d-box {
+  width: 148px;
+  height: 252px;
+}
