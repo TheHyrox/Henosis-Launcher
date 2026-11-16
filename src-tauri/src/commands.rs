@@ -252,6 +252,40 @@ pub async fn get_ra_achievements(
     .map_err(e)
 }
 
+#[tauri::command]
+pub async fn search_ra_games(
+    app: AppHandle,
+    game_id: i64,
+    query: String,
+) -> R<Vec<crate::retroachievements::RaGameCandidate>> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        crate::retroachievements::search_games(&state.db, game_id, &query)
+    })
+    .await
+    .map_err(e)?
+}
+
+#[tauri::command]
+pub async fn apply_ra_match(
+    app: AppHandle,
+    game_id: i64,
+    ra_game_id: i64,
+    apply_metadata: bool,
+) -> R<Game> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        crate::retroachievements::apply_ra_match(&state.db, game_id, ra_game_id, apply_metadata)
+    })
+    .await
+    .map_err(e)?
+}
+
+#[tauri::command]
+pub fn unlink_ra_game(state: State<AppState>, game_id: i64) -> R<()> {
+    crate::retroachievements::unlink_ra_game(&state.db, game_id)
+}
+
 // ── Scanning ───────────────────────────────────────────────────────────────
 
 #[derive(Clone, Serialize)]

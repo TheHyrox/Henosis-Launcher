@@ -5882,6 +5882,12 @@ body,
   border: 1px solid rgba(251, 191, 36, 0.4);
 }
 
+.meta-source-pill.src-ra {
+  background: rgba(255, 193, 7, 0.2);
+  color: #ffd54f;
+  border: 1px solid rgba(255, 193, 7, 0.45);
+}
+
 .meta-candidate-credits {
   display: flex;
   gap: 14px;

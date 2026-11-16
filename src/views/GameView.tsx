@@ -28,6 +28,7 @@ import {
   mediaSrc,
   MetadataCandidate,
   Platform,
+  RaGameCandidate,
   RaGameResult,
   Session,
 } from "../api";
@@ -185,10 +186,13 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
   const [fetchingMeta, setFetchingMeta] = useState(false);
   const [hotkeyModalOpen, setHotkeyModalOpen] = useState(false);
   const [metaModalOpen, setMetaModalOpen] = useState(false);
-  const [metaMode, setMetaMode] = useState<"search" | "artwork" | "manual">("search");
+  const [metaMode, setMetaMode] = useState<"search" | "artwork" | "retroachievements" | "manual">("search");
   const [metaSearchQuery, setMetaSearchQuery] = useState("");
   const [metaCandidates, setMetaCandidates] = useState<MetadataCandidate[]>([]);
   const [searchingCandidates, setSearchingCandidates] = useState(false);
+  const [raCandidates, setRaCandidates] = useState<RaGameCandidate[]>([]);
+  const [searchingRa, setSearchingRa] = useState(false);
+  const [raSearchError, setRaSearchError] = useState<string | null>(null);
   const [metaFocusIdx, setMetaFocusIdx] = useState(0);
 
   const metadataLinkCandidates = useMemo(
@@ -696,11 +700,66 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
     }
   };
 
+  const runRaSearch = async (queryText?: string) => {
+    if (!game || isSteamGame) return;
+    const q = (queryText ?? metaSearchQuery).trim() || game.title;
+    setMetaSearchQuery(q);
+    setSearchingRa(true);
+    setRaSearchError(null);
+    try {
+      const list = await api.searchRaGames(game.id, q);
+      setRaCandidates(list);
+    } catch (e) {
+      setRaCandidates([]);
+      setRaSearchError(String(e));
+    } finally {
+      setSearchingRa(false);
+    }
+  };
+
+  const handleApplyRaMatch = async (cand: RaGameCandidate, applyMetadata: boolean) => {
+    if (!game) return;
+    setSearchingRa(true);
+    try {
+      const updated = await api.applyRaMatch(game.id, cand.raGameId, applyMetadata);
+      setGame(updated);
+      await refreshOverview();
+      loadRa(false);
+      pushToast(
+        applyMetadata
+          ? `Linked RetroAchievements #${cand.raGameId} & applied metadata`
+          : `Linked RetroAchievements #${cand.raGameId} (${cand.numAchievements} achievements)`,
+        "success"
+      );
+      setMetaModalOpen(false);
+    } catch (e) {
+      pushToast(`Could not link RetroAchievements: ${String(e)}`, "error");
+    } finally {
+      setSearchingRa(false);
+    }
+  };
+
+  const handleUnlinkRa = async () => {
+    if (!game) return;
+    setSearchingRa(true);
+    try {
+      await api.unlinkRaGame(game.id);
+      loadRa(true);
+      pushToast("Manual RetroAchievements link cleared", "info");
+    } catch (e) {
+      pushToast(`Could not unlink RetroAchievements: ${String(e)}`, "error");
+    } finally {
+      setSearchingRa(false);
+    }
+  };
+
   const openMetaModal = () => {
     if (!game) return;
     setMetaMode("search");
     setMetaFocusIdx(0);
     setMetaSearchQuery(game.title);
+    setRaCandidates([]);
+    setRaSearchError(null);
     setMetaModalOpen(true);
     runCandidateSearch(game.title);
   };
@@ -1032,13 +1091,17 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
         return true;
       }
       if (btn === "lb" || btn === "rb") {
-        const order: Array<"search" | "artwork" | "manual"> = ["search", "artwork", "manual"];
-        setMetaMode((m) => {
-          const i = order.indexOf(m);
-          const next = btn === "rb" ? (i + 1) % order.length : (i - 1 + order.length) % order.length;
-          return order[next];
-        });
+        const order: Array<"search" | "artwork" | "retroachievements" | "manual"> = isSteamGame
+          ? ["search", "artwork", "manual"]
+          : ["search", "artwork", "retroachievements", "manual"];
+        const i = Math.max(0, order.indexOf(metaMode));
+        const nextIdx = btn === "rb" ? (i + 1) % order.length : (i - 1 + order.length) % order.length;
+        const nextMode = order[nextIdx];
+        setMetaMode(nextMode);
         setMetaFocusIdx(0);
+        if (nextMode === "retroachievements" && raCandidates.length === 0 && !searchingRa) {
+          runRaSearch(metaSearchQuery);
+        }
         return true;
       }
       if (metaMode === "search") {
@@ -1080,6 +1143,45 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
           } else {
             const cand = metadataLinkCandidates[metaFocusIdx - 1];
             if (cand) handleApplyCandidate(cand);
+          }
+          return true;
+        }
+      } else if (metaMode === "retroachievements") {
+        const maxIdx = raCandidates.length;
+        if (btn === "up") {
+          setMetaFocusIdx((i) => Math.max(0, i - 1));
+          return true;
+        }
+        if (btn === "down") {
+          setMetaFocusIdx((i) => Math.min(maxIdx, i + 1));
+          return true;
+        }
+        if (btn === "x") {
+          openKeyboard({
+            title: "Search RetroAchievements by Title or Game ID",
+            initial: metaSearchQuery || game?.title || "",
+            onSubmit: (v) => {
+              if (v.trim()) runRaSearch(v.trim());
+            },
+          });
+          return true;
+        }
+        if (btn === "y") {
+          handleUnlinkRa();
+          return true;
+        }
+        if (btn === "a") {
+          if (metaFocusIdx === 0) {
+            openKeyboard({
+              title: "Search RetroAchievements by Title or Game ID",
+              initial: metaSearchQuery || game?.title || "",
+              onSubmit: (v) => {
+                if (v.trim()) runRaSearch(v.trim());
+              },
+            });
+          } else {
+            const cand = raCandidates[metaFocusIdx - 1];
+            if (cand) handleApplyRaMatch(cand, true);
           }
           return true;
         }
@@ -1900,6 +2002,20 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
                 >
                   [🖼 Cover Artwork]
                 </button>
+                {!isSteamGame && (
+                  <button
+                    className={`game-tab ${metaMode === "retroachievements" ? "active" : ""}`}
+                    onClick={() => {
+                      setMetaMode("retroachievements");
+                      setMetaFocusIdx(0);
+                      if (raCandidates.length === 0 && !searchingRa) {
+                        runRaSearch(metaSearchQuery);
+                      }
+                    }}
+                  >
+                    [🏆 RetroAchievements]
+                  </button>
+                )}
                 <button
                   className={`game-tab ${metaMode === "manual" ? "active" : ""}`}
                   onClick={() => {
@@ -2134,6 +2250,138 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
                     })}
                   </div>
                 )}
+              </div>
+            ) : metaMode === "retroachievements" ? (
+              <div className="meta-search-pane">
+                <div
+                  className={`meta-search-bar ${metaFocusIdx === 0 ? "is-focused" : ""}`}
+                  onMouseEnter={() => setMetaFocusIdx(0)}
+                >
+                  <div className="meta-search-input-wrap">
+                    <span className="meta-search-icon">🏆</span>
+                    <input
+                      type="text"
+                      className="meta-search-input"
+                      value={metaSearchQuery}
+                      placeholder="Search RetroAchievements by title or RA Game ID (e.g. ~Hack~ or 15578)…"
+                      onChange={(e) => setMetaSearchQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.stopPropagation();
+                          runRaSearch(metaSearchQuery);
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="meta-search-actions">
+                    <button
+                      className="btn-ghost btn-sm"
+                      onClick={() =>
+                        openKeyboard({
+                          title: "Search RetroAchievements by Title or Game ID",
+                          initial: metaSearchQuery || game.title,
+                          onSubmit: (v) => {
+                            if (v.trim()) runRaSearch(v.trim());
+                          },
+                        })
+                      }
+                    >
+                      <span className="xbox-btn btn-x">X</span>
+                      <span>Keyboard</span>
+                    </button>
+                    <button
+                      className="btn-play-emerald btn-sm"
+                      onClick={() => runRaSearch(metaSearchQuery)}
+                      disabled={searchingRa}
+                    >
+                      <span>{searchingRa ? "Searching…" : "Search RA"}</span>
+                    </button>
+                    <button
+                      className="btn-ghost btn-sm"
+                      onClick={handleUnlinkRa}
+                      title="Clear manual RetroAchievements link and re-run auto match (Y)"
+                    >
+                      <span className="xbox-btn btn-y">Y</span>
+                      <span>Reset Link</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="meta-candidates-list">
+                  {searchingRa ? (
+                    <div className="meta-candidates-empty">
+                      ⟳ Searching RetroAchievements catalog for &ldquo;{metaSearchQuery}&rdquo;…
+                    </div>
+                  ) : raSearchError ? (
+                    <div className="meta-candidates-empty">{raSearchError}</div>
+                  ) : raCandidates.length === 0 ? (
+                    <div className="meta-candidates-empty">
+                      No RetroAchievements sets found for &ldquo;{metaSearchQuery}&rdquo;. Try a shorter title or paste a numeric RA Game ID.
+                    </div>
+                  ) : (
+                    raCandidates.map((cand, idx) => {
+                      const focused = metaFocusIdx === idx + 1;
+                      return (
+                        <div
+                          key={cand.raGameId}
+                          className={`meta-candidate-card ${focused ? "is-focused" : ""}`}
+                          onMouseEnter={() => setMetaFocusIdx(idx + 1)}
+                          onClick={() => handleApplyRaMatch(cand, true)}
+                        >
+                          <div className="meta-candidate-thumb">
+                            {cand.iconUrl ? (
+                              <img src={cand.iconUrl} alt={cand.title} loading="lazy" />
+                            ) : (
+                              <div className="meta-candidate-noart">No Art</div>
+                            )}
+                          </div>
+                          <div className="meta-candidate-info">
+                            <div className="meta-candidate-top">
+                              <strong>{cand.title}</strong>
+                              <div className="meta-candidate-badges">
+                                <span className="meta-source-pill src-ra">
+                                  RA #{cand.raGameId}
+                                </span>
+                                {cand.isHack && (
+                                  <span className="meta-source-pill src-local">ROM HACK</span>
+                                )}
+                                <span className="badge-glass">
+                                  {cand.numAchievements} Achievements
+                                </span>
+                                <span className="badge-mono">{cand.points} PTS</span>
+                              </div>
+                            </div>
+                            <p className="meta-candidate-desc">
+                              Link this RetroAchievements set to track achievements and optionally import its boxart &amp; metadata.
+                            </p>
+                          </div>
+                          <div className="meta-candidate-cta" style={{ display: "flex", gap: 8 }}>
+                            <button
+                              className="btn-ghost btn-sm"
+                              title="Link achievements only without changing title or cover art"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleApplyRaMatch(cand, false);
+                              }}
+                            >
+                              <span>RA Only</span>
+                            </button>
+                            <button
+                              className="btn-play-emerald btn-sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleApplyRaMatch(cand, true);
+                              }}
+                            >
+                              <span className="xbox-btn btn-a">A</span>
+                              <span>Link &amp; Apply Art</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </div>
             ) : (
               <div className="meta-manual-pane">

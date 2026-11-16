@@ -279,6 +279,15 @@ export interface RaGameResult {
   achievements: RaAchievement[];
 }
 
+export interface RaGameCandidate {
+  raGameId: number;
+  title: string;
+  iconUrl?: string | null;
+  numAchievements: number;
+  points: number;
+  isHack: boolean;
+}
+
 export interface Place {
   name: string;
   path: string;
@@ -383,6 +392,11 @@ export const api = {
   testRaCredentials: (creds: RaCredentials) => invoke<string>("test_ra_credentials", { creds }),
   getRaAchievements: (gameId: number, refresh = false) =>
     invoke<RaGameResult>("get_ra_achievements", { gameId, refresh }),
+  searchRaGames: (gameId: number, query: string) =>
+    invoke<RaGameCandidate[]>("search_ra_games", { gameId, query }),
+  applyRaMatch: (gameId: number, raGameId: number, applyMetadata = true) =>
+    invoke<Game>("apply_ra_match", { gameId, raGameId, applyMetadata }),
+  unlinkRaGame: (gameId: number) => invoke<void>("unlink_ra_game", { gameId }),
   getIgdbCredentials: () => invoke<IgdbCredentials>("get_igdb_credentials"),
   saveIgdbCredentials: (creds: IgdbCredentials) =>
     invoke<void>("save_igdb_credentials", { creds }),

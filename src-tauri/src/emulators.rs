@@ -405,8 +405,8 @@ pub struct BuildContext<'a> {
     pub bios_dir: Option<&'a str>,
     /// Directory for temporary per-launch files.
     pub run_dir: &'a Path,
-    /// RetroAchievements (username, token, hardcore), when logged in.
-    pub ra: Option<(String, String, bool)>,
+    /// RetroAchievements (username, token, hardcore, optional hash override), when logged in.
+    pub ra: Option<(String, String, bool, Option<String>)>,
 }
 
 /// Build the full command (wrappers + emulator + arguments) for a game.
@@ -497,7 +497,7 @@ pub fn build_command(emu: &Emulator, ctx: &BuildContext) -> Result<CommandSpec, 
                     _ => {}
                 }
             }
-            if let Some((user, token, hc)) = ctx.ra.as_ref() {
+            if let Some((user, token, hc, _)) = ctx.ra.as_ref() {
                 cfg.push("cheevos_enable = \"true\"".into());
                 cfg.push(format!("cheevos_username = \"{user}\""));
                 cfg.push(format!("cheevos_token = \"{token}\""));
@@ -579,12 +579,15 @@ pub fn build_command(emu: &Emulator, ctx: &BuildContext) -> Result<CommandSpec, 
             }
         }
         "melonds" => {
-            if let Some((user, token, hc)) = ctx.ra.as_ref() {
+            if let Some((user, token, hc, hash)) = ctx.ra.as_ref() {
                 settings_args.extend([
                     "--ra-user".into(), user.clone(),
                     "--ra-token".into(), token.clone(),
                     "--ra-hardcore".into(), if *hc { "true" } else { "false" }.into(),
                 ]);
+                if let Some(h) = hash {
+                    settings_args.extend(["--ra-hash".into(), h.clone()]);
+                }
             }
             if fullscreen {
                 settings_args.push("-f".into());
