@@ -14,58 +14,56 @@
 
 ---
 
-## 🌟 Overview
+## Overview
 
-**Henosis Launcher** is a modern, controller-first PC gaming hub designed to be the central living-room and desktop interface for all your games. It seamlessly unifies modern **Steam PC games**, standalone executables, and physical retro collections across **42 gaming platforms** running through curated native emulators (DuckStation, PCSX2, RPCS3, PPSSPP, Dolphin, Cemu, Eden, Azahar, melonDS, Xenia, and more).
+**Henosis Launcher** is a modern, controller-first PC gaming hub designed to be the central living-room and desktop interface for all your games. It seamlessly unifies modern **Steam PC games**, standalone executables, and physical retro collections across **22 gaming platforms** running through curated native emulators (DuckStation, PCSX2, RPCS3, PPSSPP, Dolphin, Cemu, Eden, Azahar, melonDS, Xenia, and more).
 
 Instead of a flat digital list, Henosis recreates the nostalgic feeling of browsing physical game cases, optical discs, and molded retro cartridges in interactive 3D, elevated by dynamic console environments that transform your screen to match each platform's design aesthetic.
 
 ---
 
-## ✨ Key Features
+## Key Features
 
-### 🎮 100% Controller-First Navigation
+### 100% Controller-First Navigation
 - Built from the ground up for the couch: complete navigation using standard Xbox gamepads (`D-Pad`, `A`, `B`, `X`, `Y`, `LB`, `RB`, `Guide`) with keyboard equivalents mapped.
 - **Global Xbox Guide Daemon:** Pressing the Xbox Guide button summons the launcher window from anywhere on your desktop via a high-performance KWin DBus bridge on KDE Wayland.
 
-### 🎨 Dynamic Console-Themed Environments
+### Dynamic Console-Themed Environments
 The background color palette, ambient lighting, and animated visuals adapt in real time to the selected console:
 - **Nintendo Wii U:** Soft cyan and sky-blue atmospheric gradients with animated waving ribbons and floating network orbs.
 - **Nintendo Switch / Switch 2:** Deep scarlet and crimson gradients with glowing neon waves, Joy-Con neon cyan/red edge accents, and radial pulses.
-- **PlayStation (PSP / PS1 / PS2 / PS3 / PS4 / PS5):** Cool navy, deep indigo, and slate-blue themes with flowing XMB ribbons, glowing horizon lines, and particle dust.
+- **PlayStation (PSP / PS Vita / PS1 / PS2 / PS3):** Cool navy, deep indigo, and slate-blue themes with flowing XMB ribbons, glowing horizon lines, and particle dust.
 - **Xbox 360 / Xbox:** Radiant emerald lighting, aurora sweeps, and sweeping curved energy blades echoing the Xbox 360 dashboard aesthetic.
-- **GameCube, Dreamcast, Retro Nintendo & Steam:** Tailored retro ambient lighting (GameCube purple, Dreamcast orange spiral flare, Steam deep midnight blue).
+- **GameCube, Retro Nintendo & Steam:** Tailored ambient lighting (GameCube purple, NES/SNES/N64/GB retro themes, Steam deep midnight blue).
 
-### 📦 3D Physical Media & Cover Flow Showcase
+### 3D Physical Media & Cover Flow Showcase
 - **Zero-Deformation Media:** 3D physical collectibles scale isotropically (`scale(...)`) to strictly preserve authentic physical aspect ratios. Discs remain circular, cartridges retain molded shell proportions, and DVD/keep cases match authentic Amaray/Blu-ray dimensions.
 - **Authentic Materials:** Translucent Switch scarlet red, Wii U cyan keep cases, Xbox 360 neon emerald green with embossed top headers, PS3 clear Blu-ray cases with silver bands, PS2 black cases, and molded retro cartridges with finger grips, label recesses, and gold connector pins.
 - **Full-Height 3D Cover Flow:** Center game is elevated and centered facing forward (`translateZ(170px) scale(1.42)`), while flanking titles angle inward (`rotateY(52deg)` / `rotateY(-52deg)`) with depth of field blur and glass floor reflections (`-webkit-box-reflect`).
 
-### 🛡️ Library Integrity & Smart Scanning
+### Library Integrity & Smart Scanning
 - **Automatic DLC & Update Exclusion:** Automatically excludes Nintendo Switch updates (`[v65536]`, `[v131072]`) and DLCs (`!ends_with("000")`), ensuring only playable base games appear in the library.
 - **Missing Games Purged:** Removed or moved ROM files are automatically deleted from the SQLite database (`missing = 0`) on every scan and launch.
 - **Foreground Retention:** The launcher stays in the foreground until the emulator's graphical window actually begins rendering or Steam marks the game active.
 
-### 🤖 Wayland Automation Bridge & MCP Server
+### Wayland Automation Bridge & MCP Server
 - **Embedded Test Bridge (`127.0.0.1:9998`):** Native HTTP listener embedded in the Rust binary to dispatch gamepad input, query UI state, and evaluate JavaScript.
 - **Model Context Protocol (MCP) Server:** Fully compliant JSON-RPC 2.0 stdio MCP server (`mcp-server/index.js`) providing tools for external agents and testing frameworks (`nexus_status`, `nexus_get_state`, `nexus_send_input`, `nexus_navigate`, `nexus_capture_screenshot`, `nexus_run_all_tests`).
 
 ---
 
-## 🕹️ Supported Platforms (42 Systems)
+## Supported Platforms (22 Systems)
 
 | Manufacturer | Consoles & Handhelds Supported |
 | :--- | :--- |
 | **Valve / PC** | Steam, Standalone Linux PC Games |
-| **Nintendo** | NES, SNES, Nintendo 64, GameCube, Wii, Wii U, Switch, Switch 2, Game Boy, Game Boy Color, Game Boy Advance, Nintendo DS, Nintendo 3DS, Pokémon Mini |
-| **Sony** | PlayStation 1, PlayStation 2, PlayStation 3, PlayStation 4, PlayStation 5, PSP, PS Vita |
-| **Sega** | Master System, Genesis / Mega Drive, Sega CD, Sega 32X, Saturn, Dreamcast, Game Gear |
+| **Nintendo** | NES, SNES, Nintendo 64, GameCube, Wii, Wii U, Switch, Switch 2, Game Boy, Game Boy Color, Game Boy Advance, Nintendo DS, Nintendo 3DS |
+| **Sony** | PlayStation 1, PlayStation 2, PlayStation 3, PSP, PS Vita |
 | **Microsoft** | Original Xbox, Xbox 360 |
-| **Retro & Other** | Neo Geo, Neo Geo Pocket, Atari 2600, Atari 7800, Atari Lynx, WonderSwan, PC Engine / TurboGrafx-16, MSX |
 
 ---
 
-## 🧩 Supported Emulators
+## Supported Emulators
 
 To guarantee compatibility, per-game configuration, and controller-first integration, Henosis officially supports the following emulators:
 
@@ -94,7 +92,7 @@ To guarantee compatibility, per-game configuration, and controller-first integra
 
 ---
 
-## 🖥️ System Requirements
+## System Requirements
 
 > [!IMPORTANT]
 > **Henosis Launcher currently targets Linux only.** Testing and primary development are performed on **CachyOS / Arch Linux with KDE Plasma Wayland**.
@@ -111,7 +109,7 @@ To guarantee compatibility, per-game configuration, and controller-first integra
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### 1. Clone & Install Dependencies
 ```bash
@@ -138,7 +136,7 @@ The compiled binary will be placed in `src-tauri/target/release/henosis-launcher
 
 ---
 
-## 🧪 Automated Testing & MCP
+## Automated Testing & MCP
 
 Henosis includes an automated feature test suite connecting directly to the running Wayland window:
 
@@ -162,7 +160,7 @@ The server is configured in `~/.gemini/config/mcp_config.json` under `henosis-wa
 
 ---
 
-## 📁 Project Architecture
+## Project Architecture
 
 ```
 ├── GEMINI.md                    # Architecture rules & agent reference guide
@@ -207,7 +205,7 @@ The server is configured in `~/.gemini/config/mcp_config.json` under `henosis-wa
 
 ---
 
-## 📄 License
+## License
 
 Henosis Launcher is released under the **MIT License**.
 Games, artwork, and emulators belong to their respective copyright holders. Henosis Launcher does not distribute ROMs or proprietary emulator files.
