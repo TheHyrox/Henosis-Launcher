@@ -1,14 +1,12 @@
-// Persistent Top Bar (48px) and Persistent Bottom Action Bar (40px)
-// Implements Global Design System & Foundations specification:
-// - Top Bar Left: Brand ID (Henosis) and top-level navigation pill (Library, Consoles, Settings)
-// - Top Bar Right: Global Search shortcut hint ((Y) Search), Network status indicator,
-//   Controller profile badge (Xbox / DualSense / Switch Pro), and tabular system clock.
-// - Bottom Action Bar Left: Contextual controller button legends dynamically generated per screen.
-// - Bottom Action Bar Right: Session analytics ticker (PLAYTIME: Xh, Battery / Status).
+// Persistent Header (52px) and Persistent Quiet Footer (36px)
+// Calm neutral charcoal (#141518) with warm amber (#e9a23b) active accent:
+// - Header Left: Plain "Henosis" wordmark + 3 text tabs (Library, Consoles, Settings) with thin amber underline
+// - Header Right: Rescan action, minimal controller status, and tabular clock
+// - Footer Left: Outlined circle + label per controller button (4-5 relevant hints)
+// - Footer Right: "<X> h played · Ready"
 
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { api } from "../api";
 import { onPadStatus } from "../input";
 import { useStore } from "../store";
 
@@ -35,9 +33,14 @@ export interface PromptItem {
 }
 
 function detectControllerProfile(rawName: string, connected: boolean): string {
-  if (!connected) return "Xbox / Key";
+  if (!connected) return "Keyboard";
   const lower = rawName.toLowerCase();
-  if (lower.includes("dualsense") || lower.includes("dualshock") || lower.includes("playstation") || lower.includes("sony")) {
+  if (
+    lower.includes("dualsense") ||
+    lower.includes("dualshock") ||
+    lower.includes("playstation") ||
+    lower.includes("sony")
+  ) {
     return "DualSense";
   }
   if (lower.includes("switch") || lower.includes("pro controller") || lower.includes("nintendo")) {
@@ -47,11 +50,11 @@ function detectControllerProfile(rawName: string, connected: boolean): string {
 }
 
 function formatTotalHours(seconds: number): string {
-  if (!seconds || seconds <= 0) return "0h";
+  if (!seconds || seconds <= 0) return "0.0 h played";
   const hrs = seconds / 3600;
-  if (hrs < 1) return `${Math.max(1, Math.round(seconds / 60))}m`;
-  if (hrs < 10) return `${hrs.toFixed(1)}h`;
-  return `${Math.round(hrs)}h`;
+  if (hrs < 0.1) return `${Math.max(1, Math.round(seconds / 60))} m played`;
+  if (hrs < 100) return `${hrs.toFixed(1)} h played`;
+  return `${Math.round(hrs)} h played`;
 }
 
 export const TopBar: React.FC = () => {
@@ -67,8 +70,6 @@ export const TopBar: React.FC = () => {
     scanStatus,
     running,
     setQuickMenu,
-    openKeyboard,
-    pushToast,
   } = useStore();
 
   const [clock, setClock] = useState(() =>
@@ -78,9 +79,6 @@ export const TopBar: React.FC = () => {
     connected: false,
     name: "",
   });
-  const [online, setOnline] = useState<boolean>(() =>
-    typeof navigator !== "undefined" ? navigator.onLine : true
-  );
 
   useEffect(() => {
     const t = setInterval(() => {
@@ -89,59 +87,18 @@ export const TopBar: React.FC = () => {
       );
     }, 10000);
     const unsub = onPadStatus(setPad);
-    const handleOnline = () => setOnline(true);
-    const handleOffline = () => setOnline(false);
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
     return () => {
       clearInterval(t);
       unsub();
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
     };
   }, []);
 
   const handleOpenLibrary = () => {
     if (screen.kind === "platform") return;
-    const targetPlat =
-      platforms[homeIndex] || platforms[0] || platformDefs[0];
+    const targetPlat = platforms[homeIndex] || platforms[0] || platformDefs[0];
     if (targetPlat) {
       navigate({ kind: "platform", platformId: targetPlat.id });
     }
-  };
-
-  const handleGlobalSearch = () => {
-    openKeyboard({
-      title: "Global Library Search",
-      initial: "",
-      placeholder: "Type game or console title…",
-      onSubmit: async (q) => {
-        const query = q.trim().toLowerCase();
-        if (!query) return;
-        try {
-          const allGames = await api.getGames(null);
-          const match = allGames.find(
-            (g) => !g.hidden && !g.missing && g.title.toLowerCase().includes(query)
-          );
-          if (match) {
-            navigate({ kind: "game", gameId: match.id });
-            return;
-          }
-          const platMatch = platforms.find(
-            (p) =>
-              p.name.toLowerCase().includes(query) ||
-              p.shortName.toLowerCase().includes(query)
-          );
-          if (platMatch) {
-            navigate({ kind: "platform", platformId: platMatch.id });
-            return;
-          }
-          pushToast(`No titles matching "${q}"`, "info");
-        } catch (err) {
-          pushToast(String(err), "error");
-        }
-      },
-    });
   };
 
   const isLibraryActive = screen.kind === "platform" || screen.kind === "game";
@@ -150,9 +107,8 @@ export const TopBar: React.FC = () => {
   return (
     <header className="topbar">
       <div className="topbar-left">
-        <button className="brand-pill" onClick={goHome} title="Henosis Home">
-          <span className="brand-glyph">◆</span>
-          <span className="brand-name">Henosis</span>
+        <button className="brand-wordmark" onClick={goHome} title="Henosis Home">
+          Henosis
         </button>
 
         <nav className="topbar-nav" aria-label="Primary Navigation">
@@ -204,15 +160,6 @@ export const TopBar: React.FC = () => {
 
       <div className="topbar-right">
         <button
-          className="topbar-search-hint"
-          onClick={handleGlobalSearch}
-          title="Global Search (Y)"
-        >
-          <span className="xbox-btn btn-y">Y</span>
-          <span>{screen.kind === "platform" ? "Filter / Search" : "Search"}</span>
-        </button>
-
-        <button
           className="topbar-action"
           onClick={() => triggerScan()}
           disabled={scanning}
@@ -221,21 +168,13 @@ export const TopBar: React.FC = () => {
           ↻ Rescan
         </button>
 
-        <div
-          className={`network-badge ${online ? "is-online" : "is-offline"}`}
-          title={online ? "Network Online" : "Offline Mode"}
+        <span
+          className={`pad-status ${pad.connected ? "is-connected" : ""}`}
+          title={pad.connected ? pad.name : "Keyboard & Controller Ready"}
         >
-          <span className="net-dot" />
-          <span>{online ? "Online" : "Offline"}</span>
-        </div>
-
-        <div
-          className={`pad-indicator ${pad.connected ? "connected" : "disconnected"}`}
-          title={pad.connected ? pad.name : "Keyboard & Controller Input Ready"}
-        >
-          <span className="pad-icon">🎮</span>
-          <span className="pad-text">{profileLabel}</span>
-        </div>
+          <span className="pad-status-dot" />
+          <span>{profileLabel}</span>
+        </span>
 
         <button
           className="topbar-clock"
@@ -261,40 +200,28 @@ export const BottomPromptBar: React.FC<{ items: PromptItem[] }> = ({ items }) =>
     }
   }, [slot]);
 
+  const visibleItems = items.slice(0, 5);
+
   const content = (
     <footer className="promptbar">
       <div className="promptbar-list">
-        {items.map((it, idx) => {
-          const btnSlug = it.btn.toLowerCase().replace(/[^a-z0-9]/g, "");
-          return (
-            <button
-              key={`${it.btn}-${idx}`}
-              className="prompt-item"
-              onClick={it.onClick}
-              disabled={!it.onClick}
-            >
-              <span className={`xbox-btn btn-${btnSlug}`}>{it.btn}</span>
-              <span className="prompt-label">{it.label}</span>
-            </button>
-          );
-        })}
+        {visibleItems.map((it, idx) => (
+          <button
+            key={`${it.btn}-${idx}`}
+            className="prompt-item"
+            onClick={it.onClick}
+            disabled={!it.onClick}
+          >
+            <span className="btn-circle">{it.btn}</span>
+            <span className="prompt-label">{it.label}</span>
+          </button>
+        ))}
       </div>
 
       <div className="promptbar-analytics">
-        <div className="analytics-ticker-item">
-          <span className="ticker-label">PLAYTIME:</span>
-          <strong className="ticker-val">{formatTotalHours(totalPlaytimeSeconds)}</strong>
-        </div>
+        <span>{formatTotalHours(totalPlaytimeSeconds)}</span>
         <span className="ticker-sep">·</span>
-        <div className="analytics-ticker-item">
-          <span className="status-led" />
-          <span className="ticker-val">{running ? "SESSION ACTIVE" : "READY"}</span>
-        </div>
-        <span className="ticker-sep">·</span>
-        <div className="promptbar-hint">
-          <span className="xbox-btn btn-guide">❖</span>
-          <span>Guide</span>
-        </div>
+        <span>{running ? "Session active" : "Ready"}</span>
       </div>
     </footer>
   );

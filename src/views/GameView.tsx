@@ -23,7 +23,6 @@ import {
   Game,
   GameMetadataUpdate,
   GameSettings,
-  getContrastTextColor,
   LaunchPreview,
   mediaSrc,
   MetadataCandidate,
@@ -39,10 +38,10 @@ import { usePad } from "../input";
 import { useStore } from "../store";
 
 const TABS = [
-  { id: "overview", label: "OVERVIEW" },
-  { id: "settings", label: "EMULATOR CONFIG" },
-  { id: "achievements", label: "ACHIEVEMENTS" },
-  { id: "sessions", label: "LOGS" },
+  { id: "overview", label: "Overview" },
+  { id: "settings", label: "Emulator" },
+  { id: "achievements", label: "Achievements" },
+  { id: "sessions", label: "Logs" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -810,7 +809,7 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
     return [
       {
         id: "meta-title",
-        group: "Core Identity",
+        group: "Identity",
         label: "Game Title",
         hint: "Display title (locks title against automatic scan overwrites)",
         valueLabel: game.title,
@@ -826,7 +825,7 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
       },
       {
         id: "meta-platform",
-        group: "Core Identity",
+        group: "Identity",
         label: "Console Platform",
         hint: "Reassign if this ROM was detected under the wrong system",
         valueLabel: platform?.name || game.platform,
@@ -846,7 +845,7 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
       },
       {
         id: "meta-region",
-        group: "Core Identity",
+        group: "Identity",
         label: "Region Tag",
         hint: "USA, Europe, Japan, World (Press Y to clear)",
         valueLabel: game.region || "Unspecified",
@@ -865,7 +864,7 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
       },
       {
         id: "meta-serial",
-        group: "Core Identity",
+        group: "Identity",
         label: "Serial / Title ID",
         hint: "Product code or 16-digit Title ID (Press Y to clear)",
         valueLabel: game.serial || "None",
@@ -880,7 +879,7 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
       },
       {
         id: "meta-developer",
-        group: "Credits & Release Info",
+        group: "Credits",
         label: "Developer",
         hint: "Studio that developed the game",
         valueLabel: m.developer || "Default / Unknown",
@@ -895,7 +894,7 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
       },
       {
         id: "meta-publisher",
-        group: "Credits & Release Info",
+        group: "Credits",
         label: "Publisher",
         hint: "Company that published the game",
         valueLabel: m.publisher || "Default / Unknown",
@@ -910,7 +909,7 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
       },
       {
         id: "meta-year",
-        group: "Credits & Release Info",
+        group: "Credits",
         label: "Release Year / Date",
         hint: "Original release year or date",
         valueLabel: m.releaseDate || String(platform?.year || ""),
@@ -925,7 +924,7 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
       },
       {
         id: "meta-genre",
-        group: "Credits & Release Info",
+        group: "Credits",
         label: "Genre",
         hint: "Game genres (e.g. Action · RPG · Platformer)",
         valueLabel: m.genre || "Default",
@@ -940,7 +939,7 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
       },
       {
         id: "meta-description",
-        group: "Credits & Release Info",
+        group: "Credits",
         label: "Synopsis / Description",
         hint: "About this game text displayed on the Overview tab",
         valueLabel: m.description
@@ -957,7 +956,7 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
       },
       {
         id: "meta-cover",
-        group: "Artwork & Media Links",
+        group: "Artwork",
         label: "3D Box / Cover Art",
         hint: "Press A to browse local image file · Press Y to clear wrong cover",
         valueLabel: game.cover ? "Custom / Linked Art" : "None (Fallback Vector)",
@@ -972,7 +971,7 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
       },
       {
         id: "meta-hero",
-        group: "Artwork & Media Links",
+        group: "Artwork",
         label: "Hero Backdrop / Screenshot",
         hint: "Press A to browse local image file · Press Y to clear wrong backdrop",
         valueLabel: game.hero ? "Custom / Linked Hero" : "None",
@@ -987,7 +986,7 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
       },
       {
         id: "meta-logo",
-        group: "Artwork & Media Links",
+        group: "Artwork",
         label: "Clear Logo / Marquee",
         hint: "Press A to browse local image file · Press Y to clear",
         valueLabel: game.logo ? "Custom / Linked Logo" : "None",
@@ -1357,33 +1356,30 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
     >
       <div className="ambient-backdrop" />
 
-      {/* Top Centered Command Hub Tab Bar: (LB) [OVERVIEW] [EMULATOR CONFIG] [ACHIEVEMENTS] [LOGS] (RB) */}
+      {/* Top Tab Bar */}
       <div className="game-hub-tabbar">
         <button className="btn-back" onClick={back}>
-          ← {platform.shortName} Library (B)
+          ← {platform.shortName}
         </button>
 
         <div className="game-tabs">
-          <span className="pill-hint">LB</span>
           {TABS.map((t, idx) => (
             <button
               key={t.id}
               className={`game-tab ${idx === tabIdx ? "active" : ""}`}
               onClick={() => setTabIdx(idx)}
             >
-              [{t.label}]
+              {t.label}
             </button>
           ))}
-          <span className="pill-hint">RB</span>
         </div>
 
         <button
-          className="btn-control"
+          className="btn-control btn-sm"
           onClick={() => setHotkeyModalOpen(true)}
           title="Custom Hotkey Mapper (Y)"
         >
-          <span className="xbox-btn btn-y">Y</span>
-          <span>Hotkeys</span>
+          Hotkeys
         </button>
       </div>
 
@@ -1403,19 +1399,11 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
             <CollectibleCard game={game} platform={platform} focused size="compact" />
           </div>
 
-          {/* Center: Title, Console Pill, Green [PLAY NOW (A)] CTA & Operational Pills */}
+          {/* Center: Title, Console Subtitle, Primary Play CTA & Secondary Actions */}
           <div className="game-hero-meta">
             <div className="game-badges">
-              <span
-                className="badge-accent"
-                style={{
-                  background: platform.accent,
-                  color: getContrastTextColor(platform.accent),
-                }}
-              >
-                [{platform.name}]
-              </span>
-              <span className="badge-glass">{platform.media.toUpperCase()}</span>
+              <span className="badge-glass">{platform.name}</span>
+              <span className="badge-glass">{platform.media}</span>
               {game.region && <span className="badge-glass">{game.region}</span>}
               {game.serial && <span className="badge-mono">{game.serial}</span>}
             </div>
@@ -1424,14 +1412,13 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
 
             <div className="game-hero-cta-row">
               <button
-                className={`btn-play-emerald-lg ${
+                className={`btn-primary game-play-cta ${
                   tab === "overview" && overviewFocusIdx === 0 ? "is-focused" : ""
                 }`}
                 onMouseEnter={() => setOverviewFocusIdx(0)}
                 onClick={() => (isGameRunning ? stopRunning() : launchGame(game.id))}
               >
-                <span>{isGameRunning ? "STOP GAME" : "PLAY NOW"}</span>
-                <span className="xbox-btn btn-a">A</span>
+                {isGameRunning ? "Stop" : "Play"}
               </button>
 
               <div className="hero-operational-pills">
@@ -1442,7 +1429,7 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
                   onMouseEnter={() => setOverviewFocusIdx(1)}
                   onClick={() => triggerOverviewItem(1)}
                 >
-                  {game.favorite ? "★ Fav" : "☆ Fav"}
+                  {game.favorite ? "★ Favorited" : "☆ Favorite"}
                 </button>
                 <button
                   className={`op-pill ${
@@ -1450,9 +1437,9 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
                   }`}
                   onMouseEnter={() => setOverviewFocusIdx(2)}
                   onClick={() => triggerOverviewItem(2)}
-                  title="Fix Wrong Linked Metadata & Edit Artwork"
+                  title="Fix Metadata & Artwork"
                 >
-                  ✎ Fix / Edit Meta
+                  Fix Metadata
                 </button>
                 <button
                   className={`op-pill ${
@@ -1461,7 +1448,7 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
                   onMouseEnter={() => setOverviewFocusIdx(3)}
                   onClick={() => triggerOverviewItem(3)}
                 >
-                  🎮 Controls
+                  Controls
                 </button>
               </div>
             </div>
@@ -1948,38 +1935,43 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
         )}
       </main>
 
-      {/* Adjust & Fix Linked Game Metadata Modal */}
+      {/* Fix Metadata Side Sheet (game remains visible behind it) */}
       {metaModalOpen && (
-        <div className="modal-backdrop" onClick={() => setMetaModalOpen(false)}>
-          <div className="meta-fixer-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="qd-drawer-header">
-              <div>
-                <span className="qd-drawer-eyebrow">Metadata &amp; Artwork Link Manager</span>
-                <h3 className="meta-fixer-title">Adjust &amp; Fix Linked Metadata</h3>
+        <div className="meta-sheet-backdrop" onClick={() => setMetaModalOpen(false)}>
+          <aside className="meta-fixer-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="meta-sheet-header">
+              <div className="meta-sheet-title-row">
+                <h3>Fix Metadata</h3>
+                <button className="qd-close-btn" onClick={() => setMetaModalOpen(false)}>
+                  ✕
+                </button>
               </div>
+              <div className="meta-sheet-file">
+                <code className="mono-path">{game.path}</code>
+              </div>
+
               <div className="meta-fixer-tabs">
-                <span className="pill-hint">LB</span>
                 <button
-                  className={`game-tab ${metaMode === "search" ? "active" : ""}`}
+                  className={`meta-tab ${metaMode === "search" ? "active" : ""}`}
                   onClick={() => {
                     setMetaMode("search");
                     setMetaFocusIdx(0);
                   }}
                 >
-                  [🔍 Metadata Link]
+                  Match
                 </button>
                 <button
-                  className={`game-tab ${metaMode === "artwork" ? "active" : ""}`}
+                  className={`meta-tab ${metaMode === "artwork" ? "active" : ""}`}
                   onClick={() => {
                     setMetaMode("artwork");
                     setMetaFocusIdx(0);
                   }}
                 >
-                  [🖼 Cover Artwork]
+                  Cover
                 </button>
                 {!isSteamGame && (
                   <button
-                    className={`game-tab ${metaMode === "retroachievements" ? "active" : ""}`}
+                    className={`meta-tab ${metaMode === "retroachievements" ? "active" : ""}`}
                     onClick={() => {
                       setMetaMode("retroachievements");
                       setMetaFocusIdx(0);
@@ -1988,44 +1980,33 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
                       }
                     }}
                   >
-                    [🏆 RetroAchievements]
+                    Achievements
                   </button>
                 )}
                 <button
-                  className={`game-tab ${metaMode === "manual" ? "active" : ""}`}
+                  className={`meta-tab ${metaMode === "manual" ? "active" : ""}`}
                   onClick={() => {
                     setMetaMode("manual");
                     setMetaFocusIdx(0);
                   }}
                 >
-                  [✎ Manual Fields]
+                  Details
                 </button>
-                <span className="pill-hint">RB</span>
               </div>
-              <button className="qd-close-btn" onClick={() => setMetaModalOpen(false)}>
-                <span className="xbox-btn btn-b">B</span>
-                <span>Close</span>
-              </button>
             </div>
 
-            <div className="meta-fixer-filebar">
-              <span>ROM / Target File:</span>
-              <code>{game.path}</code>
-            </div>
-
-            {metaMode === "search" ? (
-              <div className="meta-search-pane">
-                <div
-                  className={`meta-search-bar ${metaFocusIdx === 0 ? "is-focused" : ""}`}
-                  onMouseEnter={() => setMetaFocusIdx(0)}
-                >
-                  <div className="meta-search-input-wrap">
-                    <span className="meta-search-icon">🔍</span>
+            <div className="meta-sheet-body">
+              {metaMode === "search" ? (
+                <div className="meta-search-pane">
+                  <div
+                    className={`meta-search-bar ${metaFocusIdx === 0 ? "is-focused" : ""}`}
+                    onMouseEnter={() => setMetaFocusIdx(0)}
+                  >
                     <input
                       type="text"
                       className="meta-search-input"
                       value={metaSearchQuery}
-                      placeholder="Enter correct game title to search matches…"
+                      placeholder="Search game title…"
                       onChange={(e) => setMetaSearchQuery(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
@@ -2034,123 +2015,76 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
                         }
                       }}
                     />
-                  </div>
-                  <div className="meta-search-actions">
                     <button
-                      className="btn-ghost btn-sm"
-                      onClick={() =>
-                        openKeyboard({
-                          title: "Search Game Title to Fix Metadata Match",
-                          initial: metaSearchQuery || game.title,
-                          onSubmit: (v) => {
-                            if (v.trim()) runCandidateSearch(v.trim());
-                          },
-                        })
-                      }
-                    >
-                      <span className="xbox-btn btn-x">X</span>
-                      <span>Keyboard</span>
-                    </button>
-                    <button
-                      className="btn-play-emerald btn-sm"
+                      className="btn-primary btn-sm"
                       onClick={() => runCandidateSearch(metaSearchQuery)}
                       disabled={searchingCandidates}
                     >
-                      <span>{searchingCandidates ? "Searching…" : "Search Matches"}</span>
-                    </button>
-                    <button
-                      className="btn-ghost btn-sm"
-                      onClick={() => handleResetMetadata(false)}
-                      title="Strip wrong metadata and restore clean filename (Y)"
-                    >
-                      <span className="xbox-btn btn-y">Y</span>
-                      <span>Reset to File</span>
+                      {searchingCandidates ? "Searching…" : "Search"}
                     </button>
                   </div>
-                </div>
 
-                <div className="meta-candidates-list">
-                  {searchingCandidates ? (
-                    <div className="meta-candidates-empty">
-                      ⟳ Querying IGDB &amp; Steam Store for &ldquo;{metaSearchQuery}&rdquo;…
-                    </div>
-                  ) : metadataLinkCandidates.length === 0 ? (
-                    <div className="meta-candidates-empty">
-                      No metadata matches found for &ldquo;{metaSearchQuery}&rdquo;. Try another search query or switch to [Manual Fields].
-                    </div>
-                  ) : (
-                    metadataLinkCandidates.map((cand, idx) => {
-                      const focused = metaFocusIdx === idx + 1;
-                      const thumb = mediaSrc(cand.cover) || mediaSrc(cand.hero);
-                      return (
-                        <div
-                          key={`${cand.source}-${cand.title}-${idx}`}
-                          className={`meta-candidate-card ${focused ? "is-focused" : ""}`}
-                          onMouseEnter={() => setMetaFocusIdx(idx + 1)}
-                          onClick={() => handleApplyCandidate(cand)}
-                        >
-                          <div className="meta-candidate-thumb">
-                            {thumb ? (
-                              <img src={thumb} alt={cand.title} loading="lazy" />
-                            ) : (
-                              <div className="meta-candidate-noart">No Art</div>
-                            )}
-                          </div>
-                          <div className="meta-candidate-info">
-                            <div className="meta-candidate-top">
-                              <strong>{cand.title}</strong>
-                              <div className="meta-candidate-badges">
-                                <span className={`meta-source-pill src-${cand.source}`}>
-                                  {cand.source.toUpperCase()}
-                                </span>
-                                {cand.releaseDate && (
-                                  <span className="badge-glass">{cand.releaseDate}</span>
-                                )}
-                                {cand.region && <span className="badge-glass">{cand.region}</span>}
-                                {cand.genre && <span className="badge-mono">{cand.genre}</span>}
-                              </div>
+                  <div className="meta-candidates-list">
+                    {searchingCandidates ? (
+                      <div className="meta-candidates-empty">
+                        Searching IGDB &amp; Steam Store for &ldquo;{metaSearchQuery}&rdquo;…
+                      </div>
+                    ) : metadataLinkCandidates.length === 0 ? (
+                      <div className="meta-candidates-empty">
+                        No matches found for &ldquo;{metaSearchQuery}&rdquo;. Try another query or edit fields in Details.
+                      </div>
+                    ) : (
+                      metadataLinkCandidates.map((cand, idx) => {
+                        const focused = metaFocusIdx === idx + 1;
+                        const thumb = mediaSrc(cand.cover) || mediaSrc(cand.hero);
+                        return (
+                          <div
+                            key={`${cand.source}-${cand.title}-${idx}`}
+                            className={`meta-result-row ${focused ? "is-focused" : ""}`}
+                            onMouseEnter={() => setMetaFocusIdx(idx + 1)}
+                            onClick={() => handleApplyCandidate(cand)}
+                          >
+                            <div className="meta-result-thumb">
+                              {thumb ? (
+                                <img src={thumb} alt={cand.title} loading="lazy" />
+                              ) : (
+                                <div className="meta-candidate-noart">—</div>
+                              )}
                             </div>
-                            {(cand.developer || cand.publisher) && (
-                              <div className="meta-candidate-credits">
-                                {cand.developer && <span>Dev: {cand.developer}</span>}
-                                {cand.publisher && <span>Pub: {cand.publisher}</span>}
-                              </div>
-                            )}
-                            {cand.description && (
-                              <p className="meta-candidate-desc">{cand.description}</p>
-                            )}
-                          </div>
-                          <div className="meta-candidate-cta">
+                            <div className="meta-result-info">
+                              <strong>{cand.title}</strong>
+                              <span className="meta-result-sub">
+                                {cand.source.toUpperCase()}
+                                {cand.releaseDate ? ` · ${cand.releaseDate}` : ""}
+                                {cand.developer ? ` · ${cand.developer}` : ""}
+                              </span>
+                            </div>
                             <button
-                              className="btn-play-emerald btn-sm"
+                              className="btn-control btn-sm"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleApplyCandidate(cand);
                               }}
                             >
-                              <span className="xbox-btn btn-a">A</span>
-                              <span>Link Match</span>
+                              Link
                             </button>
                           </div>
-                        </div>
-                      );
-                    })
-                  )}
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
-              </div>
-            ) : metaMode === "artwork" ? (
-              <div className="meta-search-pane">
-                <div
-                  className={`meta-search-bar ${metaFocusIdx === 0 ? "is-focused" : ""}`}
-                  onMouseEnter={() => setMetaFocusIdx(0)}
-                >
-                  <div className="meta-search-input-wrap">
-                    <span className="meta-search-icon">🖼</span>
+              ) : metaMode === "artwork" ? (
+                <div className="meta-search-pane">
+                  <div
+                    className={`meta-search-bar ${metaFocusIdx === 0 ? "is-focused" : ""}`}
+                    onMouseEnter={() => setMetaFocusIdx(0)}
+                  >
                     <input
                       type="text"
                       className="meta-search-input"
                       value={metaSearchQuery}
-                      placeholder="Search Libretro Boxart covers (e.g. Pokemon Diamond, Mario)…"
+                      placeholder="Search Libretro cover art…"
                       onChange={(e) => setMetaSearchQuery(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
@@ -2159,86 +2093,65 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
                         }
                       }}
                     />
-                  </div>
-                  <div className="meta-search-actions">
                     <button
-                      className="btn-ghost btn-sm"
-                      onClick={() =>
-                        openKeyboard({
-                          title: "Search Libretro Cover Artwork",
-                          initial: metaSearchQuery || game.title,
-                          onSubmit: (v) => {
-                            if (v.trim()) runCandidateSearch(v.trim());
-                          },
-                        })
-                      }
-                    >
-                      <span className="xbox-btn btn-x">X</span>
-                      <span>Keyboard</span>
-                    </button>
-                    <button
-                      className="btn-play-emerald btn-sm"
+                      className="btn-primary btn-sm"
                       onClick={() => runCandidateSearch(metaSearchQuery)}
                       disabled={searchingCandidates}
                     >
-                      <span>{searchingCandidates ? "Searching…" : "Search Covers"}</span>
+                      {searchingCandidates ? "Searching…" : "Search"}
                     </button>
                   </div>
-                </div>
 
-                {searchingCandidates ? (
-                  <div className="meta-candidates-empty">
-                    ⟳ Querying Libretro Thumbnails Boxart CDN for &ldquo;{metaSearchQuery}&rdquo;…
-                  </div>
-                ) : libretroArtworkCandidates.length === 0 ? (
-                  <div className="meta-candidates-empty">
-                    No Libretro boxart found for &ldquo;{metaSearchQuery}&rdquo;. Try a simpler English title (e.g. &ldquo;Pokemon Black&rdquo;).
-                  </div>
-                ) : (
-                  <div className="meta-artwork-grid">
-                    {libretroArtworkCandidates.map((cand, idx) => {
-                      const focused = metaFocusIdx === idx + 1;
-                      const thumb = mediaSrc(cand.cover);
-                      return (
-                        <div
-                          key={`lr-${cand.cover || cand.title}-${idx}`}
-                          className={`meta-artwork-card ${focused ? "is-focused" : ""}`}
-                          onMouseEnter={() => setMetaFocusIdx(idx + 1)}
-                          onClick={() => handleApplyLibretroCover(cand)}
-                        >
-                          <div className="meta-artwork-thumb">
-                            {thumb ? (
-                              <img src={thumb} alt={cand.title} loading="lazy" />
-                            ) : (
-                              <div className="meta-candidate-noart">No Art</div>
-                            )}
-                          </div>
-                          <div className="meta-artwork-footer">
-                            <strong title={cand.description || cand.title}>{cand.title}</strong>
-                            <div className="meta-artwork-meta">
-                              <span className="meta-source-pill src-libretro">LIBRETRO</span>
-                              {cand.region && <span className="badge-glass">{cand.region}</span>}
+                  {searchingCandidates ? (
+                    <div className="meta-candidates-empty">
+                      Searching Libretro Boxart for &ldquo;{metaSearchQuery}&rdquo;…
+                    </div>
+                  ) : libretroArtworkCandidates.length === 0 ? (
+                    <div className="meta-candidates-empty">
+                      No cover art found for &ldquo;{metaSearchQuery}&rdquo;.
+                    </div>
+                  ) : (
+                    <div className="meta-artwork-grid">
+                      {libretroArtworkCandidates.map((cand, idx) => {
+                        const focused = metaFocusIdx === idx + 1;
+                        const thumb = mediaSrc(cand.cover);
+                        return (
+                          <div
+                            key={`lr-${cand.cover || cand.title}-${idx}`}
+                            className={`meta-artwork-card ${focused ? "is-focused" : ""}`}
+                            onMouseEnter={() => setMetaFocusIdx(idx + 1)}
+                            onClick={() => handleApplyLibretroCover(cand)}
+                          >
+                            <div className="meta-artwork-thumb">
+                              {thumb ? (
+                                <img src={thumb} alt={cand.title} loading="lazy" />
+                              ) : (
+                                <div className="meta-candidate-noart">—</div>
+                              )}
+                            </div>
+                            <div className="meta-artwork-footer">
+                              <strong title={cand.description || cand.title}>{cand.title}</strong>
+                              <span className="meta-result-sub">
+                                {cand.region || "Libretro"}
+                              </span>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            ) : metaMode === "retroachievements" ? (
-              <div className="meta-search-pane">
-                <div
-                  className={`meta-search-bar ${metaFocusIdx === 0 ? "is-focused" : ""}`}
-                  onMouseEnter={() => setMetaFocusIdx(0)}
-                >
-                  <div className="meta-search-input-wrap">
-                    <span className="meta-search-icon">🏆</span>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : metaMode === "retroachievements" ? (
+                <div className="meta-search-pane">
+                  <div
+                    className={`meta-search-bar ${metaFocusIdx === 0 ? "is-focused" : ""}`}
+                    onMouseEnter={() => setMetaFocusIdx(0)}
+                  >
                     <input
                       type="text"
                       className="meta-search-input"
                       value={metaSearchQuery}
-                      placeholder="Search RetroAchievements by title or RA Game ID (e.g. ~Hack~ or 15578)…"
+                      placeholder="Search RetroAchievements by title or ID…"
                       onChange={(e) => setMetaSearchQuery(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
@@ -2247,187 +2160,131 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
                         }
                       }}
                     />
-                  </div>
-                  <div className="meta-search-actions">
                     <button
-                      className="btn-ghost btn-sm"
-                      onClick={() =>
-                        openKeyboard({
-                          title: "Search RetroAchievements by Title or Game ID",
-                          initial: metaSearchQuery || game.title,
-                          onSubmit: (v) => {
-                            if (v.trim()) runRaSearch(v.trim());
-                          },
-                        })
-                      }
-                    >
-                      <span className="xbox-btn btn-x">X</span>
-                      <span>Keyboard</span>
-                    </button>
-                    <button
-                      className="btn-play-emerald btn-sm"
+                      className="btn-primary btn-sm"
                       onClick={() => runRaSearch(metaSearchQuery)}
                       disabled={searchingRa}
                     >
-                      <span>{searchingRa ? "Searching…" : "Search RA"}</span>
-                    </button>
-                    <button
-                      className="btn-ghost btn-sm"
-                      onClick={handleUnlinkRa}
-                      title="Clear manual RetroAchievements link and re-run auto match (Y)"
-                    >
-                      <span className="xbox-btn btn-y">Y</span>
-                      <span>Reset Link</span>
+                      {searchingRa ? "Searching…" : "Search"}
                     </button>
                   </div>
-                </div>
 
-                <div className="meta-candidates-list">
-                  {searchingRa ? (
-                    <div className="meta-candidates-empty">
-                      ⟳ Searching RetroAchievements catalog for &ldquo;{metaSearchQuery}&rdquo;…
-                    </div>
-                  ) : raSearchError ? (
-                    <div className="meta-candidates-empty">{raSearchError}</div>
-                  ) : raCandidates.length === 0 ? (
-                    <div className="meta-candidates-empty">
-                      No RetroAchievements sets found for &ldquo;{metaSearchQuery}&rdquo;. Try a shorter title or paste a numeric RA Game ID.
-                    </div>
-                  ) : (
-                    raCandidates.map((cand, idx) => {
-                      const focused = metaFocusIdx === idx + 1;
-                      return (
-                        <div
-                          key={cand.raGameId}
-                          className={`meta-candidate-card ${focused ? "is-focused" : ""}`}
-                          onMouseEnter={() => setMetaFocusIdx(idx + 1)}
-                          onClick={() => handleApplyRaMatch(cand, true)}
-                        >
-                          <div className="meta-candidate-thumb">
-                            {cand.iconUrl ? (
-                              <img src={cand.iconUrl} alt={cand.title} loading="lazy" />
-                            ) : (
-                              <div className="meta-candidate-noart">No Art</div>
-                            )}
-                          </div>
-                          <div className="meta-candidate-info">
-                            <div className="meta-candidate-top">
-                              <strong>{cand.title}</strong>
-                              <div className="meta-candidate-badges">
-                                <span className="meta-source-pill src-ra">
-                                  RA #{cand.raGameId}
-                                </span>
-                                {cand.isHack && (
-                                  <span className="meta-source-pill src-local">ROM HACK</span>
-                                )}
-                                <span className="badge-glass">
-                                  {cand.numAchievements} Achievements
-                                </span>
-                                <span className="badge-mono">{cand.points} PTS</span>
-                              </div>
+                  <div className="meta-candidates-list">
+                    {searchingRa ? (
+                      <div className="meta-candidates-empty">
+                        Searching RetroAchievements for &ldquo;{metaSearchQuery}&rdquo;…
+                      </div>
+                    ) : raSearchError ? (
+                      <div className="meta-candidates-empty">{raSearchError}</div>
+                    ) : raCandidates.length === 0 ? (
+                      <div className="meta-candidates-empty">
+                        No RetroAchievements sets found for &ldquo;{metaSearchQuery}&rdquo;.
+                      </div>
+                    ) : (
+                      raCandidates.map((cand, idx) => {
+                        const focused = metaFocusIdx === idx + 1;
+                        return (
+                          <div
+                            key={cand.raGameId}
+                            className={`meta-result-row ${focused ? "is-focused" : ""}`}
+                            onMouseEnter={() => setMetaFocusIdx(idx + 1)}
+                            onClick={() => handleApplyRaMatch(cand, true)}
+                          >
+                            <div className="meta-result-thumb">
+                              {cand.iconUrl ? (
+                                <img src={cand.iconUrl} alt={cand.title} loading="lazy" />
+                              ) : (
+                                <div className="meta-candidate-noart">—</div>
+                              )}
                             </div>
-                            <p className="meta-candidate-desc">
-                              Link this RetroAchievements set to track achievements and optionally import its boxart &amp; metadata.
-                            </p>
-                          </div>
-                          <div className="meta-candidate-cta" style={{ display: "flex", gap: 8 }}>
+                            <div className="meta-result-info">
+                              <strong>{cand.title}</strong>
+                              <span className="meta-result-sub">
+                                RA #{cand.raGameId} · {cand.numAchievements} achievements · {cand.points} pts
+                              </span>
+                            </div>
                             <button
-                              className="btn-ghost btn-sm"
-                              title="Link achievements only without changing title or cover art"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleApplyRaMatch(cand, false);
-                              }}
-                            >
-                              <span>RA Only</span>
-                            </button>
-                            <button
-                              className="btn-play-emerald btn-sm"
+                              className="btn-control btn-sm"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleApplyRaMatch(cand, true);
                               }}
                             >
-                              <span className="xbox-btn btn-a">A</span>
-                              <span>Link &amp; Apply Art</span>
+                              Link
                             </button>
                           </div>
-                        </div>
-                      );
-                    })
-                  )}
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div className="meta-manual-pane">
-                <div className="settings-rows">
-                  {manualMetaRows.map((r, idx) => {
-                    const prevGroup = idx > 0 ? manualMetaRows[idx - 1].group : null;
-                    const isFocused = idx === Math.min(metaFocusIdx, manualMetaRows.length - 1);
-                    return (
-                      <React.Fragment key={r.id}>
-                        {r.group !== prevGroup && (
-                          <div className="settings-group-header">{r.group}</div>
-                        )}
-                        <div
-                          className={`setting-row ${isFocused ? "focused" : ""} ${
-                            r.isOverridden ? "overridden" : ""
-                          }`}
-                          onMouseEnter={() => setMetaFocusIdx(idx)}
-                          onClick={() => r.onActivate?.()}
-                        >
-                          <div className="setting-row-left">
-                            <div className="setting-row-title">
-                              <span>{r.label}</span>
-                              {r.isOverridden && <span className="override-dot">SET</span>}
+              ) : (
+                <div className="meta-manual-pane">
+                  <div className="settings-rows">
+                    {manualMetaRows.map((r, idx) => {
+                      const prevGroup = idx > 0 ? manualMetaRows[idx - 1].group : null;
+                      const isFocused = idx === Math.min(metaFocusIdx, manualMetaRows.length - 1);
+                      return (
+                        <React.Fragment key={r.id}>
+                          {r.group !== prevGroup && (
+                            <div className="settings-group-header">{r.group}</div>
+                          )}
+                          <div
+                            className={`setting-row ${isFocused ? "focused" : ""} ${
+                              r.isOverridden ? "overridden" : ""
+                            }`}
+                            onMouseEnter={() => setMetaFocusIdx(idx)}
+                            onClick={() => r.onActivate?.()}
+                          >
+                            <div className="setting-row-left">
+                              <div className="setting-row-title">
+                                <span>{r.label}</span>
+                              </div>
+                              <div className="setting-row-hint">{r.hint}</div>
                             </div>
-                            <div className="setting-row-hint">{r.hint}</div>
+                            <div className="setting-row-right">
+                              <span className="setting-value">{r.valueLabel}</span>
+                              {r.onClear && r.isOverridden && (
+                                <button
+                                  className="reset-pill"
+                                  title="Clear / Reset Field"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    r.onClear?.();
+                                  }}
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
                           </div>
-                          <div className="setting-row-right">
-                            {r.onStep && (
-                              <button
-                                className="step-btn"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  r.onStep?.(-1);
-                                }}
-                              >
-                                ◀
-                              </button>
-                            )}
-                            <span className="setting-value">{r.valueLabel}</span>
-                            {r.onStep && (
-                              <button
-                                className="step-btn"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  r.onStep?.(1);
-                                }}
-                              >
-                                ▶
-                              </button>
-                            )}
-                            {r.onClear && r.isOverridden && (
-                              <button
-                                className="reset-pill"
-                                title="Clear / Reset Field (Y)"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  r.onClear?.();
-                                }}
-                              >
-                                ✕
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </React.Fragment>
-                    );
-                  })}
+                        </React.Fragment>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+
+            <div className="meta-sheet-footer">
+              <button
+                className="btn-ghost btn-sm"
+                onClick={() =>
+                  metaMode === "retroachievements"
+                    ? handleUnlinkRa()
+                    : handleResetMetadata(false)
+                }
+              >
+                Reset to file
+              </button>
+              <button
+                className="btn-primary btn-sm"
+                onClick={() => setMetaModalOpen(false)}
+              >
+                Apply
+              </button>
+            </div>
+          </aside>
         </div>
       )}
 
@@ -2479,33 +2336,29 @@ export const GameView: React.FC<{ gameId: number; initialTab?: TabId }> = ({
         items={[
           {
             btn: "A",
-            label: tab === "settings" ? "Edit / Toggle" : "Select / Play",
+            label: tab === "settings" ? "Edit" : "Play",
             onClick: () =>
               tab === "overview"
                 ? triggerOverviewItem(overviewFocusIdx)
                 : settingRows[safeSettingIdx]?.onActivate?.(),
           },
           {
-            btn: "B",
-            label: "Back to Library",
-            onClick: back,
-          },
-          {
             btn: "LB/RB",
-            label: "Switch Tabs",
+            label: "Tab",
             onClick: () => setTabIdx((i) => (i + 1) % TABS.length),
           },
           {
-            btn: "D-PAD",
-            label: "Card Focus",
-          },
-          {
             btn: "Y",
-            label: tab === "settings" ? "Reset Row" : "Hotkey Mapper",
+            label: tab === "settings" ? "Reset" : "Hotkeys",
             onClick: () =>
               tab === "settings"
                 ? settingRows[safeSettingIdx]?.onClear?.()
                 : setHotkeyModalOpen(true),
+          },
+          {
+            btn: "B",
+            label: "Back",
+            onClick: back,
           },
         ]}
       />

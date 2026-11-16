@@ -8,7 +8,7 @@
 // - Controller Mapping: D-Pad Left/Right cycle, LB/RB Maker Filter jump, A Open Console, X Rescan, Y Global Search
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { api, formatRelativeDate, getContrastTextColor, PlatformSummary } from "../api";
+import { api, formatRelativeDate, PlatformSummary } from "../api";
 import { ConsoleHardwareSvg } from "../components/Collectible";
 import { ConsoleEnvironment } from "../components/ConsoleEnvironment";
 import { BottomPromptBar } from "../components/TopBar";
@@ -154,11 +154,8 @@ export const HomeView: React.FC = () => {
       {/* Dynamic Console-Themed Environment */}
       <ConsoleEnvironment platformId={activePlatform?.id} />
 
-      <div className="showcase-grid-floor" />
-
       {/* Manufacturer filter strip */}
       <div className="home-filter-bar">
-        <span className="pill-hint">LB</span>
         <div className="maker-tabs">
           {MAKERS.map((m, idx) => (
             <button
@@ -173,7 +170,6 @@ export const HomeView: React.FC = () => {
             </button>
           ))}
         </div>
-        <span className="pill-hint">RB</span>
 
         <div className="home-filter-spacer" />
         <button
@@ -185,28 +181,21 @@ export const HomeView: React.FC = () => {
             })
           }
         >
-          {appSettings.showEmptyPlatforms ? "All 42 Systems (View)" : "Installed Only (View)"}
+          {appSettings.showEmptyPlatforms ? "All systems" : "Installed only"}
         </button>
       </div>
 
       {activePlatform ? (
         <section className="console-hero-carousel-stage">
-          {/* Spec Center HUD Header: < SELECT CONSOLE (3/8) > / Console Title / X Games / [PRESS (A) TO OPEN] */}
           <div className="carousel-hero-header">
             <span className="carousel-hero-counter">
-              &lt; SELECT CONSOLE ({clampedHome + 1}/{filteredPlatforms.length}) &gt;
+              {activePlatform.manufacturer} · {clampedHome + 1} of {filteredPlatforms.length}
             </span>
             <h1 className="carousel-hero-active-title">{activePlatform.name}</h1>
             <span className="carousel-hero-game-count">
-              {activePlatform.gameCount} {activePlatform.gameCount === 1 ? "Game" : "Games"} ·{" "}
+              {activePlatform.gameCount} {activePlatform.gameCount === 1 ? "game" : "games"} ·{" "}
               {activePlatform.year}
             </span>
-            <button
-              className="carousel-press-open-pill"
-              onClick={() => navigate({ kind: "platform", platformId: activePlatform.id })}
-            >
-              [PRESS (A) TO OPEN]
-            </button>
           </div>
 
           <div className="console-carousel-track" ref={trackRef}>
@@ -214,7 +203,7 @@ export const HomeView: React.FC = () => {
               const offset = idx - clampedHome;
               const focused = idx === clampedHome;
               const absOffset = Math.abs(offset);
-              const opacity = focused ? 1 : Math.max(0.55, 1 - absOffset * 0.14);
+              const opacity = focused ? 1 : Math.max(0.45, 1 - absOffset * 0.16);
 
               return (
                 <div
@@ -238,18 +227,11 @@ export const HomeView: React.FC = () => {
                     }
                   }}
                 >
-                  <div className="hero-card-pedestal-glow" />
-
                   <div className="hero-card-top">
-                    <span
-                      className="hero-card-maker"
-                      style={{ borderColor: plat.accent, color: plat.accent }}
-                    >
-                      {plat.manufacturer}
-                    </span>
+                    <span className="hero-card-maker">{plat.manufacturer}</span>
                     <span className="hero-card-year">{plat.year}</span>
                     <span className="hero-card-count">
-                      {plat.gameCount} {plat.gameCount === 1 ? "Game" : "Games"}
+                      {plat.gameCount} {plat.gameCount === 1 ? "game" : "games"}
                     </span>
                   </div>
 
@@ -260,9 +242,6 @@ export const HomeView: React.FC = () => {
                   <div className="hero-card-bottom">
                     <div className="hero-card-title-group">
                       <h2 className="hero-card-title">{plat.name}</h2>
-                      <div className="hero-card-media-badge">
-                        {plat.media.toUpperCase()} COLLECTION
-                      </div>
                     </div>
 
                     <div className="hero-card-meta-row">
@@ -276,17 +255,12 @@ export const HomeView: React.FC = () => {
                     {focused && (
                       <button
                         className="hero-card-enter-btn"
-                        style={{
-                          background: plat.accent,
-                          color: getContrastTextColor(plat.accent),
-                        }}
                         onClick={(e) => {
                           e.stopPropagation();
                           navigate({ kind: "platform", platformId: plat.id });
                         }}
                       >
-                        <span>Open {plat.shortName} Library</span>
-                        <span className="xbox-btn btn-a">A</span>
+                        Open {plat.shortName}
                       </button>
                     )}
                   </div>
@@ -297,23 +271,23 @@ export const HomeView: React.FC = () => {
         </section>
       ) : (
         <section className="console-empty-state">
-          <h2>No Consoles Found in This Category</h2>
+          <h2>No consoles in this category</h2>
           <p>
-            Press <b>View (Select)</b> to browse all 42 supported gaming systems, or open{" "}
-            <b>Settings → Library &amp; ROM Folders</b> to add your games directory.
+            Switch to <b>All systems</b> to browse all supported platforms, or open{" "}
+            <b>Settings → Library</b> to add your ROM directories.
           </p>
           <div className="empty-actions">
             <button
               className="btn-primary"
               onClick={() => updateAppSettings({ ...appSettings, showEmptyPlatforms: true })}
             >
-              Show All 42 Consoles
+              Show all systems
             </button>
             <button
               className="btn-ghost"
               onClick={() => navigate({ kind: "settings", section: "directories" })}
             >
-              Configure ROM Directories
+              Library settings
             </button>
           </div>
         </section>
@@ -323,38 +297,24 @@ export const HomeView: React.FC = () => {
         items={[
           {
             btn: "A",
-            label: "Open Console",
+            label: "Open",
             onClick: activePlatform
               ? () => navigate({ kind: "platform", platformId: activePlatform.id })
               : undefined,
           },
-          ...(!running ? [{ btn: "X" as const, label: "Rescan", onClick: () => triggerScan() }] : []),
           {
             btn: "LB/RB",
-            label: "Maker Filter",
+            label: "Maker",
             onClick: () => {
               setMakerIdx((i) => (i + 1) % MAKERS.length);
               setHomeIndex(0);
             },
           },
+          ...(!running ? [{ btn: "X" as const, label: "Rescan", onClick: () => triggerScan() }] : []),
           {
             btn: "Y",
             label: "Search",
             onClick: openGlobalSearch,
-          },
-          {
-            btn: "VIEW",
-            label: appSettings.showEmptyPlatforms ? "Installed Only" : "All 42 Systems",
-            onClick: () =>
-              updateAppSettings({
-                ...appSettings,
-                showEmptyPlatforms: !appSettings.showEmptyPlatforms,
-              }),
-          },
-          {
-            btn: "B",
-            label: "Back",
-            onClick: () => setMakerIdx(0),
           },
         ]}
       />

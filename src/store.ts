@@ -18,7 +18,7 @@ export type Screen =
   | { kind: "home" }
   | { kind: "platform"; platformId: string }
   | { kind: "game"; gameId: number; initialTab?: "overview" | "settings" | "achievements" | "sessions" }
-  | { kind: "settings"; section?: "directories" | "emulators" | "platforms" | "system" };
+  | { kind: "settings"; section?: "directories" | "emulators" | "platforms" | "system" | "accounts" };
 
 export interface KeyboardModalState {
   title: string;

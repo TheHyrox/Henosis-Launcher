@@ -12,7 +12,6 @@ import {
   formatPlaytime,
   formatRelativeDate,
   Game,
-  getContrastTextColor,
   mediaSrc,
   Platform,
 } from "../api";
@@ -144,7 +143,6 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
   const [games, setGames] = useState<Game[]>([]);
   const [sortIdx, setSortIdx] = useState(0);
   const [search, setSearch] = useState("");
-  const [scraping, setScraping] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const stageRef = useRef<HTMLDivElement | null>(null);
@@ -239,21 +237,6 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
     const step = Math.min(5, Math.max(1, Math.floor(visibleGames.length / 4)));
     const nextIdx = Math.max(0, Math.min(visibleGames.length - 1, focusIdx + dir * step));
     setPlatformFocus(platformId, nextIdx);
-  };
-
-  const handleScrapeAll = async () => {
-    if (scraping || !platform) return;
-    setScraping(true);
-    pushToast(`Fetching artwork & metadata for ${platform.shortName}…`, "info");
-    try {
-      const count = await api.fetchPlatformMetadata(platform.id);
-      await loadGames();
-      pushToast(`Updated metadata for ${count} title(s)`, "success");
-    } catch (e) {
-      pushToast(String(e), "error");
-    } finally {
-      setScraping(false);
-    }
   };
 
   const promptAddGame = () => {
@@ -482,34 +465,41 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
               <span>{platform.year}</span>
               <span>·</span>
               <span>
-                {platformViewMode === "coverflow"
-                  ? "3D CARTRIDGE / DISC COVERFLOW"
-                  : "HIGH-DENSITY POSTER WALL"}
+                {visibleGames.length} {visibleGames.length === 1 ? "game" : "games"}
               </span>
             </div>
-            <h1>
-              {platform.name}{" "}
-              <span className="platform-count-pill">{visibleGames.length}</span>
-            </h1>
+            <h1>{platform.name}</h1>
           </div>
         </div>
 
         <div className="platform-controls">
-          <button
-            className={`btn-view-toggle ${platformViewMode === "grid" ? "active" : ""}`}
-            onClick={() => {
-              togglePlatformViewMode();
-              setDrawerOpen(false);
-            }}
-            title="Toggle 3D Coverflow / Grid View (View / Select)"
-          >
-            <span className="xbox-btn btn-view">VIEW</span>
-            <span>{platformViewMode === "coverflow" ? "Toggle Grid" : "3D Coverflow"}</span>
-          </button>
+          <div className="segmented-toggle" role="group" aria-label="View mode">
+            <button
+              className={`seg-btn ${platformViewMode === "grid" ? "active" : ""}`}
+              onClick={() => {
+                if (platformViewMode !== "grid") {
+                  togglePlatformViewMode();
+                  setDrawerOpen(false);
+                }
+              }}
+            >
+              Grid
+            </button>
+            <button
+              className={`seg-btn ${platformViewMode === "coverflow" ? "active" : ""}`}
+              onClick={() => {
+                if (platformViewMode !== "coverflow") {
+                  togglePlatformViewMode();
+                  setDrawerOpen(false);
+                }
+              }}
+            >
+              Coverflow
+            </button>
+          </div>
 
-          <button className="btn-search-prominent" onClick={openSearch}>
-            <span className="xbox-btn btn-y">Y</span>
-            <span>{search ? `Filter: "${search}"` : "Filter"}</span>
+          <button className="btn-control" onClick={openSearch}>
+            {search ? `Filter: "${search}"` : "Filter"}
           </button>
           {search && (
             <button className="btn-ghost" onClick={() => setSearch("")}>
@@ -520,17 +510,9 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
             className="btn-control"
             onClick={() => setSortIdx((i) => (i + 1) % SORTS.length)}
           >
-            <span className="xbox-btn btn-rt">RT</span>
-            <span>Sort: {SORTS[sortIdx].label}</span>
+            Sort: {SORTS[sortIdx].label}
           </button>
-          <button
-            className="btn-control"
-            onClick={handleScrapeAll}
-            disabled={scraping}
-          >
-            {scraping ? "Scraping…" : "✦ Scrape Art"}
-          </button>
-          <button className="btn-control" onClick={promptAddGame}>
+          <button className="btn-primary btn-sm" onClick={promptAddGame}>
             + Add ROM
           </button>
         </div>
@@ -565,26 +547,15 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
            SCREEN 2: 3D CARTRIDGE / DISC COVERFLOW VIEW
            ═══════════════════════════════════════════════════════════════════════ */
         <div className="coverflow-layout">
-          {/* Center HUD Header: < SELECT GAME (17/25) > / Console Name / [PRESS (A) TO PLAY] */}
           <div className="coverflow-hud-top">
             <span className="coverflow-hud-counter">
-              &lt; SELECT GAME ({focusIdx + 1}/{visibleGames.length}) &gt;
+              {focusIdx + 1} of {visibleGames.length}
             </span>
-            <span className="coverflow-hud-console">{platform.name}</span>
-            {focusedGame && (
-              <button
-                className="coverflow-press-play-pill"
-                onClick={() => launchGame(focusedGame.id)}
-              >
-                [PRESS (A) TO PLAY]
-              </button>
-            )}
           </div>
 
           {/* Center Showcase: 3D Cover Flow Carousel */}
           <section className="coverflow-stage-section">
             <div className="coverflow-stage" ref={stageRef}>
-              {/* Dynamic Floor Reflection: blurred mirror plane simulating showroom glass pedestal */}
               <div className="coverflow-glass-floor" />
 
               <CoverFlow3D
@@ -598,82 +569,45 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
             </div>
           </section>
 
-          {/* Focused Game Spotlight Information Panel */}
+          {/* Unified Bottom Essentials Strip */}
           {focusedGame && (
-            <aside className="coverflow-spotlight-panel">
-              <div className="spotlight-panel-inner">
-                <div className="spotlight-panel-left">
-                  <div className="spotlight-panel-badges">
-                    <span
-                      className="badge-accent"
-                      style={{
-                        background: platform.accent,
-                        color: getContrastTextColor(platform.accent),
-                      }}
-                    >
-                      {platform.shortName}
-                    </span>
-                    {focusedGame.region && <span className="badge-glass">{focusedGame.region}</span>}
-                    {focusedGame.metadata?.releaseDate && (
-                      <span className="badge-glass">{focusedGame.metadata.releaseDate}</span>
-                    )}
-                    {focusedGame.metadata?.genre && (
-                      <span className="badge-glass">{focusedGame.metadata.genre}</span>
-                    )}
-                    {focusedGame.favorite && <span className="badge-gold">★ Favorite</span>}
-                  </div>
-
-                  <h2 className="spotlight-panel-title">{focusedGame.title}</h2>
-
-                  <div className="spotlight-panel-subline">
-                    {(focusedGame.metadata?.developer || focusedGame.metadata?.publisher) && (
-                      <span className="spotlight-panel-credits">
-                        {focusedGame.metadata.developer || focusedGame.metadata.publisher}
-                      </span>
-                    )}
-                    {focusedGame.metadata?.description && (
-                      <span className="spotlight-panel-snippet">
-                        — {focusedGame.metadata.description}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="spotlight-panel-right">
-                  <div className="spotlight-panel-stats">
-                    <div>
-                      <span>PLAYTIME</span>
-                      <strong>{formatPlaytime(focusedGame.playtime)}</strong>
-                    </div>
-                    <div>
-                      <span>LAST PLAYED</span>
-                      <strong>{formatRelativeDate(focusedGame.lastPlayed)}</strong>
-                    </div>
-                    <div>
-                      <span>SIZE</span>
-                      <strong>{formatBytes(focusedGame.fileSize)}</strong>
-                    </div>
-                  </div>
-
-                  <div className="spotlight-panel-actions">
-                    <button
-                      className="btn-play-emerald"
-                      onClick={() => launchGame(focusedGame.id)}
-                    >
-                      <span className="xbox-btn btn-a">A</span>
-                      <span>Play Game</span>
-                    </button>
-                    <button
-                      className="btn-details-showcase"
-                      onClick={() => navigate({ kind: "game", gameId: focusedGame.id })}
-                    >
-                      <span className="xbox-btn btn-x">X</span>
-                      <span>Game Details</span>
-                    </button>
-                  </div>
-                </div>
+            <div className="grid-bottom-preview-card">
+              <div className="grid-preview-main">
+                <strong className="spotlight-panel-title grid-preview-title">
+                  {focusedGame.title}
+                </strong>
+                <span className="grid-preview-meta">
+                  {focusedGame.metadata?.releaseDate || platform.year}
+                </span>
+                <span className="grid-preview-pipe">·</span>
+                <span className="grid-preview-meta">
+                  {focusedGame.metadata?.developer || focusedGame.metadata?.publisher || platform.manufacturer}
+                </span>
+                <span className="grid-preview-pipe">·</span>
+                <span className="grid-preview-meta tabular-nums">
+                  {formatBytes(focusedGame.fileSize)}
+                </span>
+                <span className="grid-preview-pipe">·</span>
+                <span className="grid-preview-meta">
+                  {focusedGame.lastPlayed ? formatRelativeDate(focusedGame.lastPlayed) : "Unplayed"}
+                </span>
               </div>
-            </aside>
+
+              <div className="grid-preview-actions">
+                <button
+                  className="btn-primary btn-sm"
+                  onClick={() => launchGame(focusedGame.id)}
+                >
+                  Play
+                </button>
+                <button
+                  className="btn-control btn-sm"
+                  onClick={() => navigate({ kind: "game", gameId: focusedGame.id })}
+                >
+                  Details
+                </button>
+              </div>
+            </div>
           )}
         </div>
       ) : (
@@ -731,57 +665,48 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
               </div>
             </div>
 
-            {/* Bottom Preview Card directly underneath the grid */}
+            {/* Single Bottom Essentials Strip */}
             {focusedGame && (
               <div className="grid-bottom-preview-card">
                 <div className="grid-preview-main">
                   <strong className="spotlight-panel-title grid-preview-title">
                     {focusedGame.title}
                   </strong>
-                  <span
-                    className="grid-preview-plat"
-                    style={{ borderColor: platform.accent, color: platform.accent }}
-                  >
-                    [{focusedGame.source === "steam" ? "Steam" : platform.shortName}]
-                  </span>
-                  <span className="grid-preview-pipe">|</span>
                   <span className="grid-preview-meta">
                     {focusedGame.metadata?.releaseDate || platform.year}
                   </span>
-                  <span className="grid-preview-pipe">|</span>
+                  <span className="grid-preview-pipe">·</span>
                   <span className="grid-preview-meta">
-                    {focusedGame.metadata?.genre || platform.media.toUpperCase()}
+                    {focusedGame.metadata?.developer || focusedGame.metadata?.publisher || platform.manufacturer}
                   </span>
-                  <span className="grid-preview-pipe">|</span>
+                  <span className="grid-preview-pipe">·</span>
                   <span className="grid-preview-meta tabular-nums">
-                    Playtime: {formatPlaytime(focusedGame.playtime)}
+                    {formatBytes(focusedGame.fileSize)}
                   </span>
-                  <span className="grid-preview-pipe">|</span>
-                  <span className="grid-preview-meta tabular-nums">
-                    File: {formatBytes(focusedGame.fileSize)}
+                  <span className="grid-preview-pipe">·</span>
+                  <span className="grid-preview-meta">
+                    {focusedGame.lastPlayed ? formatRelativeDate(focusedGame.lastPlayed) : "Unplayed"}
                   </span>
                 </div>
 
                 <div className="grid-preview-actions">
                   <button
-                    className="btn-play-emerald btn-sm"
+                    className="btn-primary btn-sm"
                     onClick={(e) => {
                       e.stopPropagation();
                       launchGame(focusedGame.id);
                     }}
                   >
-                    <span className="xbox-btn btn-a">A</span>
-                    <span>Play</span>
+                    Play
                   </button>
                   <button
-                    className="btn-details-showcase btn-sm"
+                    className="btn-control btn-sm"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setDrawerOpen(true);
+                      navigate({ kind: "game", gameId: focusedGame.id });
                     }}
                   >
-                    <span className="xbox-btn btn-x">X</span>
-                    <span>Quick Sheet</span>
+                    Details
                   </button>
                 </div>
               </div>
@@ -810,15 +735,7 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
                 <div className="qd-title-block">
                   <h1 className="qd-game-title">{focusedGame.title}</h1>
                   <div className="qd-pill-row">
-                    <span
-                      className="qd-console-pill"
-                      style={{
-                        background: platform.accent,
-                        color: getContrastTextColor(platform.accent),
-                      }}
-                    >
-                      [{platform.name}]
-                    </span>
+                    <span className="qd-console-pill">{platform.name}</span>
                     {focusedGame.region && (
                       <span className="badge-glass">{focusedGame.region}</span>
                     )}
@@ -840,21 +757,19 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
                   </div>
                   <div className="qd-cta-stack">
                     <button
-                      className="qd-btn-play-now"
+                      className="btn-primary qd-btn-play-now"
                       onClick={() => launchGame(focusedGame.id)}
                     >
-                      <span>PLAY NOW</span>
-                      <span className="xbox-btn btn-a">A</span>
+                      Play
                     </button>
                     <button
-                      className="qd-btn-full-page"
+                      className="btn-control qd-btn-full-page"
                       onClick={() => {
                         setDrawerOpen(false);
                         navigate({ kind: "game", gameId: focusedGame.id });
                       }}
                     >
-                      <span>FULL DETAILS</span>
-                      <span className="xbox-btn btn-x">X</span>
+                      Full Details
                     </button>
                   </div>
                 </div>
@@ -950,12 +865,12 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
           items={[
             {
               btn: "A",
-              label: "Play Game",
+              label: "Play",
               onClick: focusedGame ? () => launchGame(focusedGame.id) : undefined,
             },
             {
               btn: "X",
-              label: "Quick Sheet",
+              label: "Details",
               onClick: focusedGame ? () => setDrawerOpen(true) : undefined,
             },
             {
@@ -964,12 +879,9 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
               onClick: () => togglePlatformViewMode(),
             },
             {
-              btn: "D-PAD",
-              label: "Browse",
-            },
-            {
-              btn: "LT/RT",
-              label: "Page Jump",
+              btn: "Y",
+              label: "Filter",
+              onClick: openSearch,
             },
             {
               btn: "B",
@@ -983,25 +895,20 @@ export const PlatformView: React.FC<{ platformId: string }> = ({ platformId }) =
           items={[
             {
               btn: "A",
-              label: "Play Game",
+              label: "Play",
               onClick: focusedGame ? () => launchGame(focusedGame.id) : undefined,
             },
             {
               btn: "X",
-              label: "Game Details",
+              label: "Details",
               onClick: focusedGame
                 ? () => navigate({ kind: "game", gameId: focusedGame.id })
                 : undefined,
             },
             {
               btn: "VIEW",
-              label: "Toggle Grid",
+              label: "Grid",
               onClick: () => togglePlatformViewMode(),
-            },
-            {
-              btn: "LB/RB",
-              label: "Letter Jump",
-              onClick: () => jumpGames(1),
             },
             {
               btn: "Y",

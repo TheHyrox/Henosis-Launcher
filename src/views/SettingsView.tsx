@@ -1,23 +1,57 @@
-// Settings & Emulator Management View:
-// 1. Library & ROM Directories (Steam toggle, ROM folders, manual game adder, rescan)
-// 2. Emulator Management (auto-detect, custom search dirs, add/edit/delete emulator profiles)
-// 3. Per-Console Defaults & BIOS Paths (default emulator + BIOS directory per platform)
-// 4. System & Controller (Xbox Guide button summon, autostart, hide on launch, UI sounds)
+// Settings & Configuration View
+// Left navigation list: Library, Emulators, Consoles & BIOS, System, Accounts
+// Flat list rows separated by hairline dividers, real switches, one primary action per page,
+// red text for Remove actions, and JetBrains Mono reserved strictly for file paths and CLI args.
 
-import React, { useEffect, useState } from "react";
-import { api, Emulator, IgdbCredentials, RaCredentials, PlatformConfig, ScanDir } from "../api";
+import React, { useEffect, useMemo, useState } from "react";
+import { api, Emulator, IgdbCredentials, Platform, PlatformConfig, RaCredentials, ScanDir } from "../api";
 import { BottomPromptBar } from "../components/TopBar";
 import { usePad } from "../input";
 import { useStore } from "../store";
 
 const SECTIONS = [
-  { id: "directories", label: "Library & ROM Folders", icon: "📁" },
-  { id: "emulators", label: "Emulators", icon: "🕹" },
-  { id: "platforms", label: "Console Defaults & BIOS", icon: "🎛" },
-  { id: "system", label: "System & Controller", icon: "⚙" },
+  { id: "directories", label: "Library" },
+  { id: "emulators", label: "Emulators" },
+  { id: "platforms", label: "Consoles & BIOS" },
+  { id: "system", label: "System" },
+  { id: "accounts", label: "Accounts" },
 ] as const;
 
 type SectionId = (typeof SECTIONS)[number]["id"];
+
+const MAKER_GROUPS = ["Nintendo", "Sony", "Sega", "Microsoft", "Other"] as const;
+
+function shortenPath(p: string): string {
+  if (!p) return "";
+  const homeMatch = p.replace(/^\/home\/[^/]+/, "~");
+  if (homeMatch.length <= 44) return homeMatch;
+  const parts = homeMatch.split("/");
+  if (parts.length <= 3) return homeMatch;
+  return `${parts[0]}/…/${parts.slice(-2).join("/")}`;
+}
+
+function formatKindLabel(kind: Emulator["kind"]): string {
+  if (kind === "appimage") return "AppImage";
+  if (kind === "flatpak") return "Flatpak";
+  return "Binary";
+}
+
+const ToggleSwitch: React.FC<{
+  checked: boolean;
+  onChange: () => void;
+  label: string;
+}> = ({ checked, onChange, label }) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={checked}
+    aria-label={label}
+    className={`ui-switch ${checked ? "is-on" : ""}`}
+    onClick={onChange}
+  >
+    <span className="ui-switch-thumb" />
+  </button>
+);
 
 export const SettingsView: React.FC<{ initialSection?: SectionId }> = ({
   initialSection = "directories",
@@ -48,6 +82,10 @@ export const SettingsView: React.FC<{ initialSection?: SectionId }> = ({
   const [ra, setRa] = useState<RaCredentials>({ username: "", apiKey: "", hardcore: true });
   const [raPassword, setRaPassword] = useState("");
   const [igdb, setIgdb] = useState<IgdbCredentials>({ clientId: "", clientSecret: "" });
+  const [collapsedMakers, setCollapsedMakers] = useState<Record<string, boolean>>({});
+  const [expandedAdvanced, setExpandedAdvanced] = useState<Record<string, boolean>>({});
+  const [raStatus, setRaStatus] = useState<string | null>(null);
+  const [igdbStatus, setIgdbStatus] = useState<string | null>(null);
 
   const section = SECTIONS[secIdx].id;
 
@@ -213,107 +251,110 @@ export const SettingsView: React.FC<{ initialSection?: SectionId }> = ({
     return false;
   }, 0);
 
-  const consolePlatforms = platformDefs.filter((p) => p.id !== "steam" && p.id !== "pc");
+  const consolePlatforms = useMemo(
+    () => platformDefs.filter((p) => p.id !== "steam" && p.id !== "pc"),
+    [platformDefs]
+  );
+
+  const groupedConsoles = useMemo(() => {
+    const map: Record<string, Platform[]> = {};
+    for (const m of MAKER_GROUPS) map[m] = [];
+    for (const p of consolePlatforms) {
+      const m = MAKER_GROUPS.includes(p.manufacturer as (typeof MAKER_GROUPS)[number])
+        ? p.manufacturer
+        : "Other";
+      map[m].push(p);
+    }
+    return MAKER_GROUPS.map((maker) => ({ maker, platforms: map[maker] })).filter(
+      (g) => g.platforms.length > 0
+    );
+  }, [consolePlatforms]);
 
   return (
     <div className="settings-view">
-      <div className="ambient-backdrop" />
+      <div className="settings-shell">
+        <aside className="settings-sidebar" aria-label="Settings Categories">
+          <div className="settings-sidebar-title">Settings</div>
+          <nav className="settings-nav-list">
+            {SECTIONS.map((s, idx) => (
+              <button
+                key={s.id}
+                className={`settings-nav-item ${idx === secIdx ? "active" : ""}`}
+                onClick={() => setSecIdx(idx)}
+              >
+                {s.label}
+              </button>
+            ))}
+          </nav>
+        </aside>
 
-      <header className="settings-header">
-        <button className="btn-back" onClick={back}>
-          ← Back (B)
-        </button>
-
-        <div className="settings-tabs">
-          <span className="pill-hint">LB</span>
-          {SECTIONS.map((s, idx) => (
-            <button
-              key={s.id}
-              className={`settings-tab ${idx === secIdx ? "active" : ""}`}
-              onClick={() => setSecIdx(idx)}
-            >
-              <span>{s.icon}</span>
-              <span>{s.label}</span>
-            </button>
-          ))}
-          <span className="pill-hint">RB</span>
-        </div>
-      </header>
-
-      <main className="settings-body">
-        {/* ── 1. Library & ROM Folders ─────────────────────────────────────── */}
-        {section === "directories" && (
-          <div className="settings-section">
-            <div className="settings-card">
-              <div className="settings-card-head">
+        <main className="settings-body">
+          {/* ── 1. Library ─────────────────────────────────────────────────── */}
+          {section === "directories" && (
+            <div className="settings-page">
+              <div className="settings-page-head">
                 <div>
-                  <h3>Steam Library Integration</h3>
-                  <p>
-                    Automatically detects installed Steam games from{" "}
-                    <code>~/.local/share/Steam/steamapps/libraryfolders.vdf</code> and loads local artwork from Steam's cache.
-                  </p>
-                </div>
-                <button
-                  className={`toggle-pill ${appSettings.steamEnabled ? "on" : "off"}`}
-                  onClick={() =>
-                    updateAppSettings({
-                      ...appSettings,
-                      steamEnabled: !appSettings.steamEnabled,
-                    })
-                  }
-                >
-                  {appSettings.steamEnabled ? "Enabled" : "Disabled"}
-                </button>
-              </div>
-            </div>
-
-            <div className="settings-card">
-              <div className="settings-card-head">
-                <div>
-                  <h3>ROM & Game Directories ({scanDirs.length})</h3>
-                  <p>
-                    Add parent folders (e.g. <code>~/ROMs</code> containing <code>nes/</code>,{" "}
-                    <code>snes/</code>, <code>ps2/</code>, <code>switch/</code>) or bind a folder directly to a specific console.
-                  </p>
+                  <h2>Library</h2>
+                  <p>Manage Steam integration and local ROM directories.</p>
                 </div>
                 <div className="head-actions">
-                  <button className="btn-primary" onClick={handleAddScanDir}>
-                    + Add ROM Directory (X)
-                  </button>
                   <button
                     className="btn-ghost"
                     onClick={() => triggerScan()}
                     disabled={scanning}
                   >
-                    ↻ Rescan Now
+                    {scanning ? "Scanning…" : "Rescan"}
+                  </button>
+                  <button className="btn-primary" onClick={handleAddScanDir}>
+                    Add ROM Directory
                   </button>
                 </div>
               </div>
 
+              <div className="settings-list">
+                <div className="setting-row">
+                  <div className="setting-row-info">
+                    <strong>Steam library integration</strong>
+                    <p>
+                      Detect installed games from{" "}
+                      <code>~/.local/share/Steam/steamapps/libraryfolders.vdf</code>
+                    </p>
+                  </div>
+                  <ToggleSwitch
+                    checked={appSettings.steamEnabled}
+                    label="Steam library integration"
+                    onChange={() =>
+                      updateAppSettings({
+                        ...appSettings,
+                        steamEnabled: !appSettings.steamEnabled,
+                      })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="settings-group-header">
+                <h3>ROM directories ({scanDirs.length})</h3>
+              </div>
+
               {scanDirs.length === 0 ? (
-                <div className="muted-box">
-                  No ROM folders configured yet. Click <b>+ Add ROM Directory</b> to browse your filesystem with the controller.
+                <div className="settings-empty-note">
+                  No ROM directories added yet. Use <b>Add ROM Directory</b> to pick a folder.
                 </div>
               ) : (
-                <div className="dir-list">
+                <div className="settings-list">
                   {scanDirs.map((d) => (
-                    <div key={d.path} className="dir-row">
-                      <div className="dir-row-main">
-                        <span className="dir-icon">📂</span>
-                        <div>
-                          <div className="dir-path">{d.path}</div>
-                          <div className="dir-sub">
-                            Platform:{" "}
-                            <strong>
-                              {d.platform
-                                ? platformDefs.find((p) => p.id === d.platform)?.name || d.platform
-                                : "Auto-detect by subfolder name & file extension"}
-                            </strong>
-                          </div>
-                        </div>
+                    <div key={d.path} className="setting-row">
+                      <div className="setting-row-info">
+                        <code className="mono-path">{shortenPath(d.path)}</code>
+                        <p>
+                          {d.platform
+                            ? platformDefs.find((p) => p.id === d.platform)?.name || d.platform
+                            : "Auto-detect by subfolder and extension"}
+                        </p>
                       </div>
 
-                      <div className="dir-row-actions">
+                      <div className="setting-row-controls">
                         <select
                           className="dark-select"
                           value={d.platform || ""}
@@ -326,16 +367,16 @@ export const SettingsView: React.FC<{ initialSection?: SectionId }> = ({
                             await loadAll();
                           }}
                         >
-                          <option value="">Auto-detect Consoles</option>
+                          <option value="">Auto-detect</option>
                           {consolePlatforms.map((p) => (
                             <option key={p.id} value={p.id}>
-                              Force: {p.name}
+                              {p.name}
                             </option>
                           ))}
                         </select>
 
                         <button
-                          className="btn-danger-ghost"
+                          className="btn-danger-text"
                           onClick={() => handleRemoveScanDir(d.path)}
                         >
                           Remove
@@ -346,97 +387,98 @@ export const SettingsView: React.FC<{ initialSection?: SectionId }> = ({
                 </div>
               )}
             </div>
-          </div>
-        )}
+          )}
 
-        {/* ── 2. Emulator Management ───────────────────────────────────────── */}
-        {section === "emulators" && (
-          <div className="settings-section">
-            <div className="settings-card">
-              <div className="settings-card-head">
+          {/* ── 2. Emulators ───────────────────────────────────────────────── */}
+          {section === "emulators" && (
+            <div className="settings-page">
+              <div className="settings-page-head">
                 <div>
-                  <h3>Installed Emulators ({emulators.length})</h3>
+                  <h2>Emulators</h2>
                   <p>
-                    Henosis acts as a frontend for your standalone emulators (System binaries, Flatpaks, and AppImages) as well as RetroArch cores.
+                    Standalone binaries, Flatpaks, AppImages, and RetroArch profiles (
+                    {emulators.length}).
                   </p>
                 </div>
                 <div className="head-actions">
-                  <button className="btn-primary" onClick={handleDetectEmulators}>
-                    🔍 Auto-Detect Emulators (X)
-                  </button>
                   <button className="btn-ghost" onClick={handleAddEmulatorDir}>
-                    + Add Emulator Folder
+                    Add Folder
                   </button>
                   <button className="btn-ghost" onClick={() => startNewEmulator("custom")}>
-                    + Add Custom Emulator
+                    Add Custom
+                  </button>
+                  <button className="btn-primary" onClick={handleDetectEmulators}>
+                    Auto-detect
                   </button>
                 </div>
               </div>
 
               {emuDirs.length > 0 && (
                 <div className="emu-dirs-strip">
-                  <span>Extra search folders:</span>
+                  <span>Search folders:</span>
                   {emuDirs.map((d) => (
-                    <span key={d} className="tag-mono">
-                      {d}
-                    </span>
+                    <code key={d} className="mono-path">
+                      {shortenPath(d)}
+                    </code>
                   ))}
                 </div>
               )}
 
               {emulators.length === 0 ? (
-                <div className="muted-box">
-                  No emulators registered yet. Click <b>Auto-Detect Emulators</b> or add an emulator executable manually below.
+                <div className="settings-empty-note">
+                  No emulators configured yet. Run <b>Auto-detect</b> or add one manually.
                 </div>
               ) : (
-                <div className="emu-grid">
-                  {emulators.map((emu) => (
-                    <div key={emu.id} className="emu-card">
-                      <div className="emu-card-top">
-                        <div>
-                          <h4>{emu.name}</h4>
-                          <span className="emu-kind-badge">{emu.kind.toUpperCase()}</span>
+                <div className="settings-list">
+                  {emulators.map((emu) => {
+                    const consoleNames = emu.platforms
+                      .slice(0, 5)
+                      .map((pid) => platformDefs.find((p) => p.id === pid)?.shortName || pid)
+                      .join(", ");
+                    const extraCount =
+                      emu.platforms.length > 5 ? ` +${emu.platforms.length - 5}` : "";
+                    return (
+                      <div key={emu.id} className="setting-row">
+                        <div className="setting-row-info">
+                          <div className="emu-row-title">
+                            <strong>{emu.name}</strong>
+                            <span className="emu-row-type">{formatKindLabel(emu.kind)}</span>
+                          </div>
+                          <p className="emu-row-meta">
+                            <code className="mono-path">{shortenPath(emu.exec)}</code>
+                            {consoleNames && (
+                              <span className="emu-row-consoles">
+                                {" · "}
+                                {consoleNames}
+                                {extraCount}
+                              </span>
+                            )}
+                          </p>
                         </div>
-                        <div className="emu-card-btns">
+
+                        <div className="setting-row-controls">
                           <button
-                            className="btn-ghost-sm"
+                            className="btn-ghost btn-sm"
                             onClick={() => setEditingEmu({ ...emu })}
                           >
                             Configure
                           </button>
                           <button
-                            className="btn-danger-sm"
+                            className="btn-danger-text"
                             onClick={() => handleDeleteEmulator(emu.id)}
                           >
-                            ✕
+                            Remove
                           </button>
                         </div>
                       </div>
-                      <div className="emu-exec">{emu.exec}</div>
-                      <div className="emu-args">
-                        <span>Args:</span> <code>{emu.args}</code>
-                      </div>
-                      <div className="emu-plats">
-                        {emu.platforms.slice(0, 10).map((pid) => (
-                          <span key={pid} className="plat-chip">
-                            {platformDefs.find((p) => p.id === pid)?.shortName || pid}
-                          </span>
-                        ))}
-                        {emu.platforms.length > 10 && (
-                          <span className="plat-chip">+{emu.platforms.length - 10} more</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
-            </div>
 
-            <div className="settings-card">
-              <h3>Add From Supported Emulator Presets</h3>
-              <p className="card-sub">
-                Pick a preset to pre-populate command-line templates and supported consoles, then select your binary or AppImage.
-              </p>
+              <div className="settings-group-header">
+                <h3>Add from preset</h3>
+              </div>
               <div className="preset-chips">
                 {presets.map((p) => (
                   <button
@@ -449,199 +491,308 @@ export const SettingsView: React.FC<{ initialSection?: SectionId }> = ({
                 ))}
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* ── 3. Per-Console Default Emulator & BIOS Paths ─────────────────── */}
-        {section === "platforms" && (
-          <div className="settings-section">
-            <div className="settings-card">
-              <h3>Per-Console Default Emulator & BIOS / Firmware Folders</h3>
-              <p className="card-sub">
-                Choose which emulator runs each console by default (individual games can still override this on their page) and specify custom BIOS directories.
-              </p>
-
-              <div className="plat-config-list">
-                {consolePlatforms.map((plat) => {
-                  const cfg = platConfigs[plat.id];
-                  const compat = emulators.filter((e) => e.platforms.includes(plat.id));
-                  return (
-                    <div key={plat.id} className="plat-config-row">
-                      <div className="plat-config-name">
-                        <span
-                          className="plat-dot"
-                          style={{ background: plat.accent }}
-                        />
-                        <div>
-                          <strong>{plat.name}</strong>
-                          <div className="plat-config-sub">
-                            {plat.manufacturer} · {plat.year}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="plat-config-controls">
-                        <select
-                          className="dark-select"
-                          value={cfg?.defaultEmulator || ""}
-                          onChange={(e) =>
-                            updatePlatConfig(plat.id, {
-                              defaultEmulator: e.target.value || null,
-                            })
-                          }
-                        >
-                          <option value="">
-                            Auto ({compat[0]?.name || "No emulator installed"})
-                          </option>
-                          {compat.map((e) => (
-                            <option key={e.id} value={e.id}>
-                              {e.name}
-                            </option>
-                          ))}
-                        </select>
-
-                        <button
-                          className="btn-ghost"
-                          onClick={() =>
-                            openFileBrowser({
-                              title: `Select BIOS / Firmware Directory for ${plat.shortName}`,
-                              initialPath: cfg?.biosDir || null,
-                              pickMode: "dir",
-                              onPick: (path) => updatePlatConfig(plat.id, { biosDir: path }),
-                            })
-                          }
-                        >
-                          {cfg?.biosDir ? `BIOS: ${cfg.biosDir}` : "Set BIOS Folder…"}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+          {/* ── 3. Consoles & BIOS (42-row grouped page) ───────────────────── */}
+          {section === "platforms" && (
+            <div className="settings-page">
+              <div className="settings-page-head">
+                <div>
+                  <h2>Consoles &amp; BIOS</h2>
+                  <p>
+                    Default emulator and firmware directories across {consolePlatforms.length}{" "}
+                    supported systems.
+                  </p>
+                </div>
               </div>
-            </div>
-          </div>
-        )}
 
-        {/* ── 4. System & Controller ───────────────────────────────────────── */}
-        {section === "system" && (
-          <div className="settings-section">
-            <div className="settings-card">
-              <h3>Controller & Window Behavior</h3>
-              <div className="sys-toggle-list">
-                <div className="sys-row">
-                  <div>
-                    <strong>Summon Launcher with Xbox Guide Button</strong>
+              {groupedConsoles.map(({ maker, platforms: list }) => {
+                const isCollapsed = !!collapsedMakers[maker];
+                return (
+                  <div key={maker} className="maker-group-block">
+                    <button
+                      className="maker-group-toggle"
+                      onClick={() =>
+                        setCollapsedMakers((prev) => ({ ...prev, [maker]: !prev[maker] }))
+                      }
+                    >
+                      <span>{maker}</span>
+                      <span className="maker-group-count">
+                        {list.length} {isCollapsed ? "▸" : "▾"}
+                      </span>
+                    </button>
+
+                    {!isCollapsed && (
+                      <div className="settings-list">
+                        {list.map((plat) => {
+                          const cfg = platConfigs[plat.id];
+                          const compat = emulators.filter((e) => e.platforms.includes(plat.id));
+                          const activeEmu =
+                            compat.find((e) => e.id === cfg?.defaultEmulator) || compat[0];
+                          const advOpen = !!expandedAdvanced[plat.id];
+
+                          return (
+                            <div key={plat.id} className="console-config-item">
+                              <div className="setting-row">
+                                <div className="setting-row-info">
+                                  <strong>{plat.name}</strong>
+                                  <p>
+                                    {plat.year} ·{" "}
+                                    {activeEmu
+                                      ? `Default: ${activeEmu.name}`
+                                      : "No emulator installed"}
+                                    {cfg?.biosDir ? ` · BIOS set` : ""}
+                                  </p>
+                                </div>
+                                <div className="setting-row-controls">
+                                  <button
+                                    className="btn-ghost btn-sm"
+                                    onClick={() =>
+                                      setExpandedAdvanced((prev) => ({
+                                        ...prev,
+                                        [plat.id]: !prev[plat.id],
+                                      }))
+                                    }
+                                  >
+                                    {advOpen ? "Hide Advanced" : "Advanced"}
+                                  </button>
+                                </div>
+                              </div>
+
+                              {advOpen && (
+                                <div className="console-advanced-drawer">
+                                  <div className="advanced-field">
+                                    <span>Emulator override</span>
+                                    <select
+                                      className="dark-select"
+                                      value={cfg?.defaultEmulator || ""}
+                                      onChange={(e) =>
+                                        updatePlatConfig(plat.id, {
+                                          defaultEmulator: e.target.value || null,
+                                        })
+                                      }
+                                    >
+                                      <option value="">
+                                        Auto ({compat[0]?.name || "None"})
+                                      </option>
+                                      {compat.map((e) => (
+                                        <option key={e.id} value={e.id}>
+                                          {e.name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+
+                                  <div className="advanced-field">
+                                    <span>BIOS folder</span>
+                                    <div className="advanced-bios-control">
+                                      {cfg?.biosDir && (
+                                        <code className="mono-path">{shortenPath(cfg.biosDir)}</code>
+                                      )}
+                                      <button
+                                        className="btn-ghost btn-sm"
+                                        onClick={() =>
+                                          openFileBrowser({
+                                            title: `Select BIOS Directory for ${plat.shortName}`,
+                                            initialPath: cfg?.biosDir || null,
+                                            pickMode: "dir",
+                                            onPick: (path) =>
+                                              updatePlatConfig(plat.id, { biosDir: path }),
+                                          })
+                                        }
+                                      >
+                                        {cfg?.biosDir ? "Change…" : "Set BIOS Folder…"}
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ── 4. System ──────────────────────────────────────────────────── */}
+          {section === "system" && (
+            <div className="settings-page">
+              <div className="settings-page-head">
+                <div>
+                  <h2>System</h2>
+                  <p>Controller input, window lifecycle, and library maintenance.</p>
+                </div>
+              </div>
+
+              <div className="settings-list">
+                <div className="setting-row">
+                  <div className="setting-row-info">
+                    <strong>Summon launcher with Xbox Guide button</strong>
                     <p>
-                      Pressing the Xbox button on your controller brings Henosis to the front from anywhere on your desktop (using a KWin focus bridge on KDE Wayland).
+                      Bring Henosis to the foreground from anywhere on your desktop via KWin DBus.
                     </p>
                   </div>
-                  <button
-                    className={`toggle-pill ${appSettings.guideSummons ? "on" : "off"}`}
-                    onClick={() =>
+                  <ToggleSwitch
+                    checked={appSettings.guideSummons}
+                    label="Summon launcher with Xbox Guide button"
+                    onChange={() =>
                       updateAppSettings({
                         ...appSettings,
                         guideSummons: !appSettings.guideSummons,
                       })
                     }
-                  >
-                    {appSettings.guideSummons ? "Enabled" : "Disabled"}
-                  </button>
+                  />
                 </div>
 
-                <div className="sys-row">
-                  <div>
-                    <strong>Hide Launcher While a Game Is Running</strong>
+                <div className="setting-row">
+                  <div className="setting-row-info">
+                    <strong>Hide launcher while a game is running</strong>
                     <p>
-                      Automatically hides the Henosis window on launch and restores focus as soon as you exit the game.
+                      Minimize Henosis once the emulator or Steam window renders, and restore on
+                      exit.
                     </p>
                   </div>
-                  <button
-                    className={`toggle-pill ${appSettings.hideOnLaunch ? "on" : "off"}`}
-                    onClick={() =>
+                  <ToggleSwitch
+                    checked={appSettings.hideOnLaunch}
+                    label="Hide launcher while a game is running"
+                    onChange={() =>
                       updateAppSettings({
                         ...appSettings,
                         hideOnLaunch: !appSettings.hideOnLaunch,
                       })
                     }
-                  >
-                    {appSettings.hideOnLaunch ? "Enabled" : "Disabled"}
-                  </button>
+                  />
                 </div>
 
-                <div className="sys-row">
-                  <div>
-                    <strong>Console UI Navigation Sounds</strong>
-                    <p>Synthesized low-latency audio feedback when moving across cards and menus.</p>
+                <div className="setting-row">
+                  <div className="setting-row-info">
+                    <strong>UI navigation sounds</strong>
+                    <p>Subtle audio feedback when moving across cards and menus.</p>
                   </div>
-                  <button
-                    className={`toggle-pill ${appSettings.uiSounds ? "on" : "off"}`}
-                    onClick={() =>
+                  <ToggleSwitch
+                    checked={appSettings.uiSounds}
+                    label="UI navigation sounds"
+                    onChange={() =>
                       updateAppSettings({
                         ...appSettings,
                         uiSounds: !appSettings.uiSounds,
                       })
                     }
-                  >
-                    {appSettings.uiSounds ? "Enabled" : "Disabled"}
-                  </button>
+                  />
                 </div>
 
-                <div className="sys-row">
-                  <div>
-                    <strong>Start Henosis at Login (Background Service)</strong>
+                <div className="setting-row">
+                  <div className="setting-row-info">
+                    <strong>Start Henosis at login</strong>
                     <p>
-                      Writes an XDG autostart entry (<code>~/.config/autostart/henosis-launcher.desktop</code>) so the Xbox button works immediately after booting.
+                      Write an XDG autostart entry at{" "}
+                      <code>~/.config/autostart/henosis-launcher.desktop</code>.
                     </p>
                   </div>
-                  <button
-                    className={`toggle-pill ${appSettings.autostart ? "on" : "off"}`}
-                    onClick={() =>
+                  <ToggleSwitch
+                    checked={appSettings.autostart}
+                    label="Start Henosis at login"
+                    onChange={() =>
                       updateAppSettings({
                         ...appSettings,
                         autostart: !appSettings.autostart,
                       })
                     }
-                  >
-                    {appSettings.autostart ? "Enabled" : "Disabled"}
-                  </button>
+                  />
                 </div>
 
-                <div className="sys-row">
-                  <div>
-                    <strong>Purge Missing Library Entries</strong>
-                    <p>Remove database entries for ROMs or games whose files were deleted from disk.</p>
+                <div className="setting-row">
+                  <div className="setting-row-info">
+                    <strong>Show empty consoles</strong>
+                    <p>Display all 42 supported systems even when no ROMs are installed.</p>
+                  </div>
+                  <ToggleSwitch
+                    checked={appSettings.showEmptyPlatforms}
+                    label="Show empty consoles"
+                    onChange={() =>
+                      updateAppSettings({
+                        ...appSettings,
+                        showEmptyPlatforms: !appSettings.showEmptyPlatforms,
+                      })
+                    }
+                  />
+                </div>
+
+                <div className="setting-row">
+                  <div className="setting-row-info">
+                    <strong>Purge missing library entries</strong>
+                    <p>Remove database entries for files that no longer exist on disk.</p>
                   </div>
                   <button
-                    className="btn-ghost"
+                    className="btn-ghost btn-sm"
                     onClick={async () => {
                       const n = await api.purgeMissing();
                       await refreshOverview();
                       pushToast(`Removed ${n} missing entries`, "info");
                     }}
                   >
-                    Clean Up Library
+                    Clean Up
                   </button>
                 </div>
               </div>
             </div>
+          )}
 
-            <div className="settings-card">
-              <h3>Metadata & Artwork Scrapers (Steam Store · Libretro · IGDB)</h3>
-              <p className="card-sub">
-                Steam Store metadata and Libretro console boxart work automatically out of the box. To also fetch full synopses, developers, publishers, and screenshots from <b>IGDB</b> for retro ROMs, enter your free Twitch Developer Client ID & Secret below.
-              </p>
+          {/* ── 5. Accounts (IGDB & RetroAchievements) ─────────────────────── */}
+          {section === "accounts" && (
+            <div className="settings-page">
+              <div className="settings-page-head">
+                <div>
+                  <h2>Accounts</h2>
+                  <p>
+                    External metadata and achievement services. Steam Store and Libretro boxart
+                    work without credentials.
+                  </p>
+                </div>
+              </div>
 
-              <div className="form-grid" style={{ marginTop: 14 }}>
-                <label>
-                  <span>Twitch / IGDB Client ID</span>
-                  <div className="input-with-btn">
+              <div className="settings-group-header">
+                <h3>IGDB (Twitch Developer)</h3>
+                <div className="head-actions">
+                  {igdbStatus && <span className="inline-status">{igdbStatus}</span>}
+                  <button
+                    className="btn-ghost btn-sm"
+                    onClick={async () => {
+                      try {
+                        await api.saveIgdbCredentials(igdb);
+                        setIgdbStatus(
+                          igdb.clientId && igdb.clientSecret ? "Saved" : "Missing keys"
+                        );
+                        pushToast("IGDB credentials saved", "success");
+                      } catch (err) {
+                        setIgdbStatus("Error");
+                        pushToast(String(err), "error");
+                      }
+                    }}
+                  >
+                    Test &amp; Save
+                  </button>
+                </div>
+              </div>
+
+              <div className="settings-list">
+                <div className="setting-row">
+                  <div className="setting-row-info">
+                    <strong>Client ID</strong>
+                    <p>Twitch Developer application Client ID for IGDB lookups.</p>
+                  </div>
+                  <div className="setting-inline-input">
                     <input
                       value={igdb.clientId}
                       placeholder="Twitch Client ID"
                       onChange={(e) => setIgdb({ ...igdb, clientId: e.target.value })}
                     />
                     <button
-                      className="btn-ghost"
+                      className="btn-ghost btn-sm"
                       onClick={() =>
                         openKeyboard({
                           title: "IGDB / Twitch Client ID",
@@ -653,11 +804,14 @@ export const SettingsView: React.FC<{ initialSection?: SectionId }> = ({
                       ⌨
                     </button>
                   </div>
-                </label>
+                </div>
 
-                <label>
-                  <span>Twitch / IGDB Client Secret</span>
-                  <div className="input-with-btn">
+                <div className="setting-row">
+                  <div className="setting-row-info">
+                    <strong>Client Secret</strong>
+                    <p>Used locally to request an IGDB OAuth token.</p>
+                  </div>
+                  <div className="setting-inline-input">
                     <input
                       type="password"
                       value={igdb.clientSecret}
@@ -665,7 +819,7 @@ export const SettingsView: React.FC<{ initialSection?: SectionId }> = ({
                       onChange={(e) => setIgdb({ ...igdb, clientSecret: e.target.value })}
                     />
                     <button
-                      className="btn-ghost"
+                      className="btn-ghost btn-sm"
                       onClick={() =>
                         openKeyboard({
                           title: "IGDB / Twitch Client Secret",
@@ -677,39 +831,55 @@ export const SettingsView: React.FC<{ initialSection?: SectionId }> = ({
                       ⌨
                     </button>
                   </div>
-                </label>
+                </div>
               </div>
 
-              <div className="modal-actions" style={{ marginTop: 12 }}>
-                <button
-                  className="btn-primary"
-                  onClick={async () => {
-                    await api.saveIgdbCredentials(igdb);
-                    pushToast("IGDB credentials saved", "success");
-                  }}
-                >
-                  Save IGDB Credentials
-                </button>
+              <div className="settings-group-header">
+                <h3>RetroAchievements</h3>
+                <div className="head-actions">
+                  {raStatus && <span className="inline-status">{raStatus}</span>}
+                  <button
+                    className="btn-ghost btn-sm"
+                    onClick={async () => {
+                      try {
+                        const who = await api.testRaCredentials(ra);
+                        setRaStatus(`Connected: ${who}`);
+                        pushToast(`Connected: ${who}`, "success");
+                      } catch (err) {
+                        setRaStatus("Failed");
+                        pushToast(`RetroAchievements: ${String(err)}`, "error");
+                      }
+                    }}
+                  >
+                    Test
+                  </button>
+                  <button
+                    className="btn-primary btn-sm"
+                    onClick={async () => {
+                      await api.saveRaCredentials(ra);
+                      setRaStatus("Saved");
+                      pushToast("RetroAchievements credentials saved", "success");
+                    }}
+                  >
+                    Save
+                  </button>
+                </div>
               </div>
-            </div>
 
-            <div className="settings-card">
-              <h3>RetroAchievements</h3>
-              <p className="card-sub">
-                Show achievements and progress for retro games. Enter your RetroAchievements username and{" "}
-                <b>Web API key</b> (retroachievements.org → Settings → Keys).
-              </p>
-              <div className="form-grid" style={{ marginTop: 14 }}>
-                <label>
-                  <span>Username</span>
-                  <div className="input-with-btn">
+              <div className="settings-list">
+                <div className="setting-row">
+                  <div className="setting-row-info">
+                    <strong>Username</strong>
+                    <p>Your RetroAchievements account handle.</p>
+                  </div>
+                  <div className="setting-inline-input">
                     <input
                       value={ra.username}
-                      placeholder="RetroAchievements username"
+                      placeholder="Username"
                       onChange={(e) => setRa({ ...ra, username: e.target.value })}
                     />
                     <button
-                      className="btn-ghost"
+                      className="btn-ghost btn-sm"
                       onClick={() =>
                         openKeyboard({
                           title: "RetroAchievements Username",
@@ -721,18 +891,22 @@ export const SettingsView: React.FC<{ initialSection?: SectionId }> = ({
                       ⌨
                     </button>
                   </div>
-                </label>
-                <label>
-                  <span>Web API Key</span>
-                  <div className="input-with-btn">
+                </div>
+
+                <div className="setting-row">
+                  <div className="setting-row-info">
+                    <strong>Web API Key</strong>
+                    <p>Found under retroachievements.org → Settings → Keys.</p>
+                  </div>
+                  <div className="setting-inline-input">
                     <input
                       type="password"
                       value={ra.apiKey}
-                      placeholder="Web API key"
+                      placeholder="Web API Key"
                       onChange={(e) => setRa({ ...ra, apiKey: e.target.value })}
                     />
                     <button
-                      className="btn-ghost"
+                      className="btn-ghost btn-sm"
                       onClick={() =>
                         openKeyboard({
                           title: "RetroAchievements Web API Key",
@@ -744,116 +918,81 @@ export const SettingsView: React.FC<{ initialSection?: SectionId }> = ({
                       ⌨
                     </button>
                   </div>
-                </label>
-              </div>
-              <div className="sys-row" style={{ marginTop: 12 }}>
-                <div>
-                  <strong>Hardcore Mode (Default)</strong>
-                  <p>
-                    When enabled, savestates, cheats, slow-motion, frame-step, and RAM search are disabled and grayed out in melonDS / RetroArch. Turn off to play chill in Softcore mode.
-                  </p>
                 </div>
-                <button
-                  className={`toggle-pill ${(ra.hardcore ?? true) ? "on" : "off"}`}
-                  onClick={async () => {
-                    const next = { ...ra, hardcore: !(ra.hardcore ?? true) };
-                    setRa(next);
-                    await api.saveRaCredentials(next);
-                    pushToast(
-                      next.hardcore
-                        ? "RetroAchievements Hardcore Mode enabled"
-                        : "RetroAchievements Softcore (Chill) Mode enabled",
-                      "info"
-                    );
-                  }}
-                >
-                  {(ra.hardcore ?? true) ? "Hardcore" : "Softcore (Chill)"}
-                </button>
-              </div>
-              <label style={{ marginTop: 10 }}>
-                <span>Password (only used once to get an emulator token, never stored)</span>
-                <div className="input-with-btn">
-                  <input
-                    type="password"
-                    value={raPassword}
-                    placeholder="RetroAchievements password"
-                    onChange={(e) => setRaPassword(e.target.value)}
+
+                <div className="setting-row">
+                  <div className="setting-row-info">
+                    <strong>Hardcore mode</strong>
+                    <p>
+                      Disables savestates and cheats in supported emulators; turn off for Softcore.
+                    </p>
+                  </div>
+                  <ToggleSwitch
+                    checked={ra.hardcore ?? true}
+                    label="Hardcore mode"
+                    onChange={async () => {
+                      const next = { ...ra, hardcore: !(ra.hardcore ?? true) };
+                      setRa(next);
+                      await api.saveRaCredentials(next);
+                      pushToast(
+                        next.hardcore ? "Hardcore mode enabled" : "Softcore mode enabled",
+                        "info"
+                      );
+                    }}
                   />
-                  <button
-                    className="btn-ghost"
-                    onClick={() =>
-                      openKeyboard({
-                        title: "RetroAchievements Password",
-                        initial: raPassword,
-                        onSubmit: (v) => setRaPassword(v),
-                      })
-                    }
-                  >
-                    ⌨
-                  </button>
                 </div>
-              </label>
-              <div className="modal-actions" style={{ marginTop: 12 }}>
-                <button
-                  className="btn-ghost"
-                  onClick={async () => {
-                    try {
-                      const who = await api.testRaCredentials(ra);
-                      pushToast(`Connected: ${who}`, "success");
-                    } catch (err) {
-                      pushToast(`RetroAchievements: ${String(err)}`, "error");
-                    }
-                  }}
-                >
-                  Test Connection
-                </button>
-                <button
-                  className="btn-ghost"
-                  title="Log in so emulators with native support (melonDS) unlock achievements while you play"
-                  onClick={async () => {
-                    try {
-                      await api.saveRaCredentials(ra);
-                      await api.raLogin(ra.username, raPassword);
-                      setRaPassword("");
-                      pushToast("Emulator login OK — in-game achievements enabled", "success");
-                    } catch (err) {
-                      pushToast(`RetroAchievements: ${String(err)}`, "error");
-                    }
-                  }}
-                >
-                  Log In for Emulators
-                </button>
-                <button
-                  className="btn-primary"
-                  onClick={async () => {
-                    await api.saveRaCredentials(ra);
-                    pushToast("RetroAchievements credentials saved", "success");
-                  }}
-                >
-                  Save RetroAchievements
-                </button>
+
+                <div className="setting-row">
+                  <div className="setting-row-info">
+                    <strong>Emulator token login</strong>
+                    <p>Password is used once to fetch an emulator token and is never stored.</p>
+                  </div>
+                  <div className="setting-inline-input">
+                    <input
+                      type="password"
+                      value={raPassword}
+                      placeholder="Password (one-time)"
+                      onChange={(e) => setRaPassword(e.target.value)}
+                    />
+                    <button
+                      className="btn-ghost btn-sm"
+                      onClick={async () => {
+                        try {
+                          await api.saveRaCredentials(ra);
+                          await api.raLogin(ra.username, raPassword);
+                          setRaPassword("");
+                          pushToast("Emulator login OK", "success");
+                        } catch (err) {
+                          pushToast(`RetroAchievements: ${String(err)}`, "error");
+                        }
+                      }}
+                    >
+                      Log In
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        )}
-      </main>
+          )}
+        </main>
+      </div>
 
-      {/* Emulator Editor Modal */}
+      {/* Emulator Configure Modal (Args & Consoles live here) */}
       {editingEmu && (
         <div className="modal-backdrop" onClick={() => setEditingEmu(null)}>
           <div className="emu-editor-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Configure Emulator Profile</h3>
+            <h3>Configure {editingEmu.name || "Emulator"}</h3>
 
             <div className="form-grid">
               <label>
-                <span>Display Name</span>
+                <span>Display name</span>
                 <div className="input-with-btn">
                   <input
                     value={editingEmu.name}
                     onChange={(e) => setEditingEmu({ ...editingEmu, name: e.target.value })}
                   />
                   <button
-                    className="btn-ghost"
+                    className="btn-ghost btn-sm"
                     onClick={() =>
                       openKeyboard({
                         title: "Emulator Name",
@@ -886,15 +1025,16 @@ export const SettingsView: React.FC<{ initialSection?: SectionId }> = ({
               </label>
 
               <label className="full-span">
-                <span>Executable Path (or Flatpak ID)</span>
+                <span>Executable path (or Flatpak ID)</span>
                 <div className="input-with-btn">
                   <input
+                    className="mono-input"
                     value={editingEmu.exec}
                     placeholder="/usr/bin/dolphin-emu or org.DolphinEmu.dolphin-emu"
                     onChange={(e) => setEditingEmu({ ...editingEmu, exec: e.target.value })}
                   />
                   <button
-                    className="btn-ghost"
+                    className="btn-ghost btn-sm"
                     onClick={() =>
                       openFileBrowser({
                         title: "Pick Emulator Executable / AppImage",
@@ -910,17 +1050,17 @@ export const SettingsView: React.FC<{ initialSection?: SectionId }> = ({
 
               <label className="full-span">
                 <span>
-                  Launch Arguments Template (tokens: <code>{"{rom}"}</code>{" "}
-                  <code>{"{settings}"}</code> <code>{"{core}"}</code>{" "}
-                  <code>{"{bios}"}</code>)
+                  Launch arguments (<code>{"{rom}"}</code>, <code>{"{settings}"}</code>,{" "}
+                  <code>{"{core}"}</code>, <code>{"{bios}"}</code>)
                 </span>
                 <div className="input-with-btn">
                   <input
+                    className="mono-input"
                     value={editingEmu.args}
                     onChange={(e) => setEditingEmu({ ...editingEmu, args: e.target.value })}
                   />
                   <button
-                    className="btn-ghost"
+                    className="btn-ghost btn-sm"
                     onClick={() =>
                       openKeyboard({
                         title: "Launch Arguments Template",
@@ -936,7 +1076,7 @@ export const SettingsView: React.FC<{ initialSection?: SectionId }> = ({
             </div>
 
             <div className="editor-plat-picker">
-              <span>Supported Consoles (click to toggle):</span>
+              <span>Supported consoles</span>
               <div className="editor-plat-chips">
                 {consolePlatforms.map((p) => {
                   const active = editingEmu.platforms.includes(p.id);
@@ -960,10 +1100,10 @@ export const SettingsView: React.FC<{ initialSection?: SectionId }> = ({
 
             <div className="modal-actions">
               <button className="btn-ghost" onClick={() => setEditingEmu(null)}>
-                Cancel (B)
+                Cancel
               </button>
               <button className="btn-primary" onClick={handleSaveEmulator}>
-                Save Emulator
+                Save
               </button>
             </div>
           </div>
@@ -972,13 +1112,16 @@ export const SettingsView: React.FC<{ initialSection?: SectionId }> = ({
 
       <BottomPromptBar
         items={[
-          { btn: "LB", label: "Prev Section", onClick: () => setSecIdx((i) => (i - 1 + SECTIONS.length) % SECTIONS.length) },
-          { btn: "RB", label: "Next Section", onClick: () => setSecIdx((i) => (i + 1) % SECTIONS.length) },
+          {
+            btn: "LB/RB",
+            label: "Category",
+            onClick: () => setSecIdx((i) => (i + 1) % SECTIONS.length),
+          },
           ...(section === "directories"
-            ? ([{ btn: "X", label: "Add ROM Folder", onClick: handleAddScanDir }] as const)
+            ? ([{ btn: "X", label: "Add Folder", onClick: handleAddScanDir }] as const)
             : []),
           ...(section === "emulators"
-            ? ([{ btn: "X", label: "Auto-Detect Emulators", onClick: handleDetectEmulators }] as const)
+            ? ([{ btn: "X", label: "Auto-detect", onClick: handleDetectEmulators }] as const)
             : []),
           { btn: "B", label: "Back", onClick: back },
         ]}
